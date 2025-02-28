@@ -5,10 +5,21 @@ const transactionsSlice = createSlice({
   initialState: { list: [] },
   reducers: {
     addTransaction: (state, action) => {
-      state.list.push({ id: Date.now(), date: new Date().toLocaleDateString(), ...action.payload });
+      state.list.push({
+        id: Date.now(),
+        createdAt: new Date().toISOString(),
+        ...action.payload,
+      });
+    },
+    updateTransaction: (state, action) => {
+      const { id, ...changes } = action.payload;
+      const transaction = state.list.find((t) => t.id === id);
+      if (transaction) {
+        Object.assign(transaction, changes);
+      }
     },
   },
 });
 
-export const { addTransaction } = transactionsSlice.actions;
+export const { addTransaction, updateTransaction } = transactionsSlice.actions;
 export default transactionsSlice.reducer;

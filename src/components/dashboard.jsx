@@ -1,32 +1,49 @@
-import { useSelector, useDispatch } from "react-redux";
-import "../App.css"
+import { useSelector, useDispatch, batch } from "react-redux";
+import { useMemo } from "react";
+import { useDebouncedCallback } from "use-debounce";
+import "../App.css";
 import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef ,useEffect,} from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { addTransaction } from "../Redux/transactionSlice";
+import { addTransaction, updateTransaction } from "../Redux/transactionSlice";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
   const transactions = useSelector((state) => state.transactions.list);
 
-  const totalCredit = transactions.filter((t) => t.type === "credit").reduce((sum, t) => sum + t.amount, 0);
-  const totalDebit = transactions.filter((t) => t.type === "debit").reduce((sum, t) => sum + t.amount, 0);
-  const netProfit = totalCredit - totalDebit;
+  // Filter and sort transactions
+  const sortedTransactions = useMemo(
+    () => transactions.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    [transactions]
+  );
 
+  // Calculate totals
+  const totalCredit = useMemo(() => 
+    transactions.filter((t) => t.type === "credit").reduce((sum, t) => sum + t.amount, 0),
+    [transactions]
+  );
+  const totalDebit = useMemo(() => 
+    transactions.filter((t) => t.type === "debit").reduce((sum, t) => sum + t.amount, 0),
+    [transactions]
+  );
+  const netProfit = useMemo(() => totalCredit - totalDebit, [totalCredit, totalDebit]);
+
+  // State for adding new transactions
   const [credit, setCredit] = useState({ amount: "", description: "", date: "" });
   const [debit, setDebit] = useState({ amount: "", description: "", date: "" });
-
   const creditRefs = [useRef(), useRef(), useRef()];
   const debitRefs = [useRef(), useRef(), useRef()];
+  const editRef = useRef();
 
-  const handleKeyDown = (e, index, refs) => {
+  // Handle key presses for adding transactions
+  const handleKeyDown = (e, index, refs, type) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (index < refs.length - 1) {
         refs[index + 1].current.focus();
       } else {
-        if (refs === creditRefs) {
+        if (type === "credit") {
           handleAddTransaction(credit.amount, credit.description, credit.date, "credit");
         } else {
           handleAddTransaction(debit.amount, debit.description, debit.date, "debit");
@@ -35,60 +52,259 @@ const Dashboard = () => {
     }
   };
 
+  // Add a new transaction
   const handleAddTransaction = (amount, description, date, type) => {
     if (!amount || !description || !date) return;
-    dispatch(addTransaction({ description, amount: parseFloat(amount), date, type }));
-    
-    if (type === "credit") {
-      setCredit({ amount: "", description: "", date: "" });
-      creditRefs[0].current.focus();
-    } else {
-      setDebit({ amount: "", description: "", date: "" });
-      debitRefs[0].current.focus();
+    batch(() => {
+      dispatch(addTransaction({ description, amount: parseFloat(amount), date, type }));
+      if (type === "credit") setCredit({ amount: "", description: "", date: "" });
+      else setDebit({ amount: "", description: "", date: "" });
+    });
+  };
+
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState(null);
+
+  // Start editing a cell
+  const startEditing = (index, transaction) => {
+    setEditingCell({
+      index,
+      fields: {
+        amount: transaction.amount,
+        description: transaction.description,
+        date: transaction.date,
+        type: transaction.type,
+      },
+    });
+  };
+
+  // Handle changes in inline editing
+  const handleInlineChange = useDebouncedCallback((field, value) => {
+    setEditingCell((prev) => ({
+      ...prev,
+      fields: { ...prev.fields, [field]: value },
+    }));
+  }, 300);
+  
+
+  // Handle key presses in inline editing
+  const handleInlineKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const { amount, description, date, type } = editingCell.fields;
+      if (!amount || !description || !date) return;
+
+      const transaction = sortedTransactions[editingCell.index];
+      dispatch(
+        updateTransaction({
+          id: transaction.id,
+          amount: parseFloat(amount),
+          description,
+          date,
+          type,
+        })
+      );
+      setEditingCell(null);
+    }
+  };
+  const saveInlineEdit = () => {
+    if (editingCell) {
+      const { amount, description, date, type } = editingCell.fields;
+      if (!amount || !description || !date) return;
+
+      const transaction = sortedTransactions[editingCell.index];
+      dispatch(updateTransaction({ id: transaction.id, amount: parseFloat(amount), description, date, type }));
+      setEditingCell(null);
     }
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (editingCell && editRef.current && !editRef.current.contains(event.target)) {
+        saveInlineEdit();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [editingCell]);
+
   return (
-    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Card className="p-6 bg-green-100 border border-green-500 shadow-md">
-        <div className="flex items-center gap-2 text-green-700 font-semibold">
-          <TrendingUp /> Total Credit
-        </div>
-        <p className="text-3xl font-bold text-green-700 mt-2">₹{totalCredit}</p>
-      </Card>
+    <div className="min-h-screen p-6 bg-gray-100 flex flex-col items-center">
+      {/* Credit, Debit, and Profit Tiles */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
+        <Card className="p-6 bg-green-100 border border-green-500 shadow-lg">
+          <div className="flex items-center gap-2 text-green-700 font-semibold">
+            <TrendingUp /> Total Credit
+          </div>
+          <p className="text-3xl font-bold text-green-700 mt-2">₹{totalCredit}</p>
+        </Card>
 
-      <Card className="p-6 bg-red-100 border border-red-500 shadow-md">
-        <div className="flex items-center gap-2 text-red-700 font-semibold">
-          <TrendingDown /> Total Debit
-        </div>
-        <p className="text-3xl font-bold text-red-700 mt-2">₹{totalDebit}</p>
-      </Card>
+        <Card className="p-6 bg-red-100 border border-red-500 shadow-lg">
+          <div className="flex items-center gap-2 text-red-700 font-semibold">
+            <TrendingDown /> Total Debit
+          </div>
+          <p className="text-3xl font-bold text-red-700 mt-2">₹{totalDebit}</p>
+        </Card>
 
-      <Card className="p-6 bg-blue-100 border border-blue-500 shadow-md">
-        <div className="flex items-center gap-2 text-blue-700 font-semibold">
-          <Wallet /> Net Profit
-        </div>
-        <p className="text-3xl font-bold text-blue-700 mt-2">₹{netProfit}</p>
-      </Card>
+        <Card className="p-6 bg-blue-100 border border-blue-500 shadow-lg">
+          <div className="flex items-center gap-2 text-blue-700 font-semibold">
+            <Wallet /> Net Profit
+          </div>
+          <p className="text-3xl font-bold text-blue-700 mt-2">₹{netProfit}</p>
+        </Card>
+      </div>
 
-      <div className="col-span-1 md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6 shadow-md">
+      {/* Credit and Debit Entry Forms */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl mt-6">
+        <Card className="p-6 shadow-lg">
           <h3 className="text-xl font-semibold mb-4 text-center text-green-700">Credit Entry</h3>
           <div className="flex gap-4">
-            <Input ref={creditRefs[0]} type="number" placeholder="Amount" value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} onKeyDown={(e) => handleKeyDown(e, 0, creditRefs)} />
-            <Input ref={creditRefs[1]} type="text" placeholder="Description" value={credit.description} onChange={(e) => setCredit({ ...credit, description: e.target.value })} onKeyDown={(e) => handleKeyDown(e, 1, creditRefs)} />
-            <Input ref={creditRefs[2]} type="date" value={credit.date} onChange={(e) => setCredit({ ...credit, date: e.target.value })} onKeyDown={(e) => handleKeyDown(e, 2, creditRefs)} />
+            <Input
+              ref={creditRefs[0]}
+              type="number"
+              placeholder="Amount"
+              value={credit.amount}
+              onChange={(e) => setCredit({ ...credit, amount: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 0, creditRefs, "credit")}
+            />
+            <Input
+              ref={creditRefs[1]}
+              type="text"
+              placeholder="Description"
+              value={credit.description}
+              onChange={(e) => setCredit({ ...credit, description: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
+            />
+            <Input
+              ref={creditRefs[2]}
+              type="date"
+              value={credit.date}
+              onChange={(e) => setCredit({ ...credit, date: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
+            />
           </div>
         </Card>
 
-        <Card className="p-6 shadow-md">
+        <Card className="p-6 shadow-lg">
           <h3 className="text-xl font-semibold mb-4 text-center text-red-700">Debit Entry</h3>
           <div className="flex gap-4">
-            <Input ref={debitRefs[0]} type="number" placeholder="Amount" value={debit.amount} onChange={(e) => setDebit({ ...debit, amount: e.target.value })} onKeyDown={(e) => handleKeyDown(e, 0, debitRefs)} />
-            <Input ref={debitRefs[1]} type="text" placeholder="Description" value={debit.description} onChange={(e) => setDebit({ ...debit, description: e.target.value })} onKeyDown={(e) => handleKeyDown(e, 1, debitRefs)} />
-            <Input ref={debitRefs[2]} type="date" value={debit.date} onChange={(e) => setDebit({ ...debit, date: e.target.value })} onKeyDown={(e) => handleKeyDown(e, 2, debitRefs)} />
+            <Input
+              ref={debitRefs[0]}
+              type="number"
+              placeholder="Amount"
+              value={debit.amount}
+              onChange={(e) => setDebit({ ...debit, amount: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 0, debitRefs, "debit")}
+            />
+            <Input
+              ref={debitRefs[1]}
+              type="text"
+              placeholder="Description"
+              value={debit.description}
+              onChange={(e) => setDebit({ ...debit, description: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
+            />
+            <Input
+              ref={debitRefs[2]}
+              type="date"
+              value={debit.date}
+              onChange={(e) => setDebit({ ...debit, date: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
+            />
           </div>
         </Card>
+      </div>
+
+      {/* Transaction Table */}
+      <div className="w-full max-w-6xl mt-6">
+        <h3 className="text-xl font-semibold my-4 text-center">Transaction List</h3>
+        <div className="border-t border-gray-300 p-4">
+          <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="p-3 text-left">Type</th>
+                <th className="p-3 text-left">Amount</th>
+                <th className="p-3 text-left">Description</th>
+                <th className="p-3 text-left">Date</th>
+                <th className="p-3 text-left">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTransactions.map((transaction, index) => (
+                <tr
+                  key={index}
+                  className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => startEditing(index, transaction)}
+                >
+                  <td className="p-3">
+                    {editingCell?.index === index ? (
+                      <select
+                        value={editingCell.fields.type}
+                        onChange={(e) => handleInlineChange("type", e.target.value)}
+                        onKeyDown={handleInlineKeyDown}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="credit">Credit</option>
+                        <option value="debit">Debit</option>
+                      </select>
+                    ) : (
+                      <span
+                        className={`font-semibold ${
+                          transaction.type === "credit" ? "text-green-700" : "text-red-700"
+                        }`}
+                      >
+                        {transaction.type}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {editingCell?.index === index ? (
+                      <Input
+                        type="number"
+                        value={editingCell.fields.amount}
+                        onChange={(e) => handleInlineChange("amount", e.target.value)}
+                        onKeyDown={handleInlineKeyDown}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      `₹${transaction.amount}`
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {editingCell?.index === index ? (
+                      <Input
+                        type="text"
+                        value={editingCell.fields.description}
+                        onChange={(e) => handleInlineChange("description", e.target.value)}
+                        onKeyDown={handleInlineKeyDown}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      transaction.description
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {editingCell?.index === index ? (
+                      <Input
+                        type="date"
+                        value={editingCell.fields.date}
+                        onChange={(e) => handleInlineChange("date", e.target.value)}
+                        onKeyDown={handleInlineKeyDown}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      transaction.date
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {new Date(transaction.createdAt).toLocaleTimeString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
