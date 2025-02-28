@@ -102,7 +102,7 @@ function Login() {
         </div>
         <p className="mt-6 text-center text-sm text-gray-600">
           Don&apos;t have an account?{" "}
-          <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors duration-300">
+          <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors duration-300">
             Register here
           </a>
         </p>

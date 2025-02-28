@@ -94,10 +94,9 @@ function Signup() {
               </button>
             </div>
           </form>
-
           <p className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{" "}
-            <a href="#" className="text-indigo-600 hover:text-indigo-500">
+            <a href="/" className="text-indigo-600 hover:text-indigo-500">
               Sign in here
             </a>
           </p>

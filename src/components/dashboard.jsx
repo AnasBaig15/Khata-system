@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import "../App.css";
 import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
-import { useState, useRef ,useEffect,} from "react";
+import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { addTransaction, updateTransaction } from "../Redux/transactionSlice";
@@ -12,31 +12,43 @@ const Dashboard = () => {
   const dispatch = useDispatch();
   const transactions = useSelector((state) => state.transactions.list);
 
-  // Filter and sort transactions
   const sortedTransactions = useMemo(
-    () => transactions.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    () =>
+      transactions
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     [transactions]
   );
 
-  // Calculate totals
-  const totalCredit = useMemo(() => 
-    transactions.filter((t) => t.type === "credit").reduce((sum, t) => sum + t.amount, 0),
+  const totalCredit = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.type === "credit")
+        .reduce((sum, t) => sum + t.amount, 0),
     [transactions]
   );
-  const totalDebit = useMemo(() => 
-    transactions.filter((t) => t.type === "debit").reduce((sum, t) => sum + t.amount, 0),
+  const totalDebit = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.type === "debit")
+        .reduce((sum, t) => sum + t.amount, 0),
     [transactions]
   );
-  const netProfit = useMemo(() => totalCredit - totalDebit, [totalCredit, totalDebit]);
+  const netProfit = useMemo(
+    () => totalCredit - totalDebit,
+    [totalCredit, totalDebit]
+  );
 
-  // State for adding new transactions
-  const [credit, setCredit] = useState({ amount: "", description: "", date: "" });
+  const [credit, setCredit] = useState({
+    amount: "",
+    description: "",
+    date: "",
+  });
   const [debit, setDebit] = useState({ amount: "", description: "", date: "" });
   const creditRefs = [useRef(), useRef(), useRef()];
   const debitRefs = [useRef(), useRef(), useRef()];
   const editRef = useRef();
 
-  // Handle key presses for adding transactions
   const handleKeyDown = (e, index, refs, type) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -44,28 +56,38 @@ const Dashboard = () => {
         refs[index + 1].current.focus();
       } else {
         if (type === "credit") {
-          handleAddTransaction(credit.amount, credit.description, credit.date, "credit");
+          handleAddTransaction(
+            credit.amount,
+            credit.description,
+            credit.date,
+            "credit"
+          );
         } else {
-          handleAddTransaction(debit.amount, debit.description, debit.date, "debit");
+          handleAddTransaction(
+            debit.amount,
+            debit.description,
+            debit.date,
+            "debit"
+          );
         }
       }
     }
   };
 
-  // Add a new transaction
   const handleAddTransaction = (amount, description, date, type) => {
     if (!amount || !description || !date) return;
     batch(() => {
-      dispatch(addTransaction({ description, amount: parseFloat(amount), date, type }));
-      if (type === "credit") setCredit({ amount: "", description: "", date: "" });
+      dispatch(
+        addTransaction({ description, amount: parseFloat(amount), date, type })
+      );
+      if (type === "credit")
+        setCredit({ amount: "", description: "", date: "" });
       else setDebit({ amount: "", description: "", date: "" });
     });
   };
 
-  // Inline editing state
   const [editingCell, setEditingCell] = useState(null);
 
-  // Start editing a cell
   const startEditing = (index, transaction) => {
     setEditingCell({
       index,
@@ -78,16 +100,13 @@ const Dashboard = () => {
     });
   };
 
-  // Handle changes in inline editing
   const handleInlineChange = useDebouncedCallback((field, value) => {
     setEditingCell((prev) => ({
       ...prev,
       fields: { ...prev.fields, [field]: value },
     }));
   }, 300);
-  
 
-  // Handle key presses in inline editing
   const handleInlineKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -113,14 +132,26 @@ const Dashboard = () => {
       if (!amount || !description || !date) return;
 
       const transaction = sortedTransactions[editingCell.index];
-      dispatch(updateTransaction({ id: transaction.id, amount: parseFloat(amount), description, date, type }));
+      dispatch(
+        updateTransaction({
+          id: transaction.id,
+          amount: parseFloat(amount),
+          description,
+          date,
+          type,
+        })
+      );
       setEditingCell(null);
     }
   };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (editingCell && editRef.current && !editRef.current.contains(event.target)) {
+      if (
+        editingCell &&
+        editRef.current &&
+        !editRef.current.contains(event.target)
+      ) {
         saveInlineEdit();
       }
     };
@@ -130,39 +161,58 @@ const Dashboard = () => {
   }, [editingCell]);
 
   return (
-    <div className="min-h-screen p-6 bg-gray-100 flex flex-col items-center">
-      {/* Credit, Debit, and Profit Tiles */}
+    <div className="min-h-screen p-6 bg-gray-100  flex flex-col items-center">
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
-        <Card className="p-6 bg-green-100 border border-green-500 shadow-lg">
-          <div className="flex items-center gap-2 text-green-700 font-semibold">
-            <TrendingUp /> Total Credit
+        <Card className="p-6 bg-white border border-gray-300 shadow-lg rounded-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 flex items-center justify-center bg-green-200 rounded-full">
+              <TrendingUp className="text-green-700" size={24} />
+            </div>
+            <div>
+              <p className="text-gray-400 font-medium">Total Credit</p>
+              <p className="text-3xl font-bold text-green-700">
+                ₹{totalCredit}
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-green-700 mt-2">₹{totalCredit}</p>
         </Card>
 
-        <Card className="p-6 bg-red-100 border border-red-500 shadow-lg">
-          <div className="flex items-center gap-2 text-red-700 font-semibold">
-            <TrendingDown /> Total Debit
+        <Card className="p-6 bg-white  border border-gray-300 shadow-lg rounded-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 flex items-center justify-center bg-red-200 rounded-full">
+              <TrendingDown className="text-red-700" size={24} />
+            </div>
+            <div>
+              <p className="text-gray-400 font-medium">Total Debit</p>
+              <p className="text-3xl font-bold text-red-700">₹{totalDebit}</p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-red-700 mt-2">₹{totalDebit}</p>
         </Card>
 
-        <Card className="p-6 bg-blue-100 border border-blue-500 shadow-lg">
-          <div className="flex items-center gap-2 text-blue-700 font-semibold">
-            <Wallet /> Net Profit
+        <Card className="p-6 bg-white border border-gray-300 shadow-lg rounded-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 flex items-center justify-center bg-blue-200 rounded-full">
+              <Wallet className="text-blue-700" size={24} />
+            </div>
+            <div>
+              <p className="text-gray-400 font-medium">Net Profit</p>
+              <p className="text-3xl font-bold text-blue-700">₹{netProfit}</p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-blue-700 mt-2">₹{netProfit}</p>
         </Card>
       </div>
 
-      {/* Credit and Debit Entry Forms */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl mt-6">
-        <Card className="p-6 shadow-lg">
-          <h3 className="text-xl font-semibold mb-4 text-center text-green-700">Credit Entry</h3>
+        <Card className="p-6 shadow-lg bg-white">
+          <div className="flex justify-center items-center gap-2 mb-4">
+            <TrendingUp className="w-6 h-6 text-green-700" />
+            <h3 className="text-xl font-bold text-green-700">Credit Entry</h3>
+          </div>
           <div className="flex gap-4">
             <Input
               ref={creditRefs[0]}
-              type="number"
+              type="alphanumeric"
               placeholder="Amount"
               value={credit.amount}
               onChange={(e) => setCredit({ ...credit, amount: e.target.value })}
@@ -173,12 +223,15 @@ const Dashboard = () => {
               type="text"
               placeholder="Description"
               value={credit.description}
-              onChange={(e) => setCredit({ ...credit, description: e.target.value })}
+              onChange={(e) =>
+                setCredit({ ...credit, description: e.target.value })
+              }
               onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
             />
             <Input
               ref={creditRefs[2]}
               type="date"
+              className="w-full border border-gray-300 bg-white"
               value={credit.date}
               onChange={(e) => setCredit({ ...credit, date: e.target.value })}
               onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
@@ -186,12 +239,15 @@ const Dashboard = () => {
           </div>
         </Card>
 
-        <Card className="p-6 shadow-lg">
-          <h3 className="text-xl font-semibold mb-4 text-center text-red-700">Debit Entry</h3>
+        <Card className="p-6 shadow-lg bg-white">
+          <div className="flex justify-center items-center gap-2 mb-4">
+            <TrendingDown className="w-6 h-6 text-red-700" />
+            <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
+          </div>
           <div className="flex gap-4">
             <Input
               ref={debitRefs[0]}
-              type="number"
+              type="alphanumeric"
               placeholder="Amount"
               value={debit.amount}
               onChange={(e) => setDebit({ ...debit, amount: e.target.value })}
@@ -200,14 +256,19 @@ const Dashboard = () => {
             <Input
               ref={debitRefs[1]}
               type="text"
+              className="text-gray-700 placeholder-black bg-white "
               placeholder="Description"
               value={debit.description}
-              onChange={(e) => setDebit({ ...debit, description: e.target.value })}
+              onChange={(e) =>
+                setDebit({ ...debit, description: e.target.value })
+              }
               onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
             />
             <Input
               ref={debitRefs[2]}
               type="date"
+              placeholder="Date"
+              className="w-full border border-gray-300 bg-white"
               value={debit.date}
               onChange={(e) => setDebit({ ...debit, date: e.target.value })}
               onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
@@ -216,18 +277,18 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Transaction Table */}
       <div className="w-full max-w-6xl mt-6">
-        <h3 className="text-xl font-semibold my-4 text-center">Transaction List</h3>
+        <h3 className="text-xl font-semibold my-4 text-center">
+          Transaction List
+        </h3>
         <div className="border-t border-gray-300 p-4">
           <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
-            <thead className="bg-gray-200">
+            <thead className="bg-gray-600">
               <tr>
-                <th className="p-3 text-left">Type</th>
-                <th className="p-3 text-left">Amount</th>
-                <th className="p-3 text-left">Description</th>
-                <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Time</th>
+                <th className="p-3 text-left text-gray-200">Type</th>
+                <th className="p-3 text-left text-gray-200">Date</th>
+                <th className="p-3 text-left text-gray-200">Description</th>
+                <th className="p-3 text-left text-gray-200">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -241,7 +302,9 @@ const Dashboard = () => {
                     {editingCell?.index === index ? (
                       <select
                         value={editingCell.fields.type}
-                        onChange={(e) => handleInlineChange("type", e.target.value)}
+                        onChange={(e) =>
+                          handleInlineChange("type", e.target.value)
+                        }
                         onKeyDown={handleInlineKeyDown}
                         className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
@@ -251,7 +314,9 @@ const Dashboard = () => {
                     ) : (
                       <span
                         className={`font-semibold ${
-                          transaction.type === "credit" ? "text-green-700" : "text-red-700"
+                          transaction.type === "credit"
+                            ? "text-green-700"
+                            : "text-red-700"
                         }`}
                       >
                         {transaction.type}
@@ -261,14 +326,16 @@ const Dashboard = () => {
                   <td className="p-3">
                     {editingCell?.index === index ? (
                       <Input
-                        type="number"
-                        value={editingCell.fields.amount}
-                        onChange={(e) => handleInlineChange("amount", e.target.value)}
+                        type="date"
+                        value={editingCell.fields.date}
+                        onChange={(e) =>
+                          handleInlineChange("date", e.target.value)
+                        }
                         onKeyDown={handleInlineKeyDown}
                         className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     ) : (
-                      `₹${transaction.amount}`
+                      transaction.date
                     )}
                   </td>
                   <td className="p-3">
@@ -276,7 +343,9 @@ const Dashboard = () => {
                       <Input
                         type="text"
                         value={editingCell.fields.description}
-                        onChange={(e) => handleInlineChange("description", e.target.value)}
+                        onChange={(e) =>
+                          handleInlineChange("description", e.target.value)
+                        }
                         onKeyDown={handleInlineKeyDown}
                         className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -287,18 +356,17 @@ const Dashboard = () => {
                   <td className="p-3">
                     {editingCell?.index === index ? (
                       <Input
-                        type="date"
-                        value={editingCell.fields.date}
-                        onChange={(e) => handleInlineChange("date", e.target.value)}
+                        type="alphanumeric"
+                        value={editingCell.fields.amount}
+                        onChange={(e) =>
+                          handleInlineChange("amount", e.target.value)
+                        }
                         onKeyDown={handleInlineKeyDown}
                         className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     ) : (
-                      transaction.date
+                      `₹${transaction.amount}`
                     )}
-                  </td>
-                  <td className="p-3">
-                    {new Date(transaction.createdAt).toLocaleTimeString()}
                   </td>
                 </tr>
               ))}
