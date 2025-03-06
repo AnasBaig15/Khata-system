@@ -8,36 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { addTransaction, updateTransaction } from "../Redux/transactionSlice";
 
+
 const Dashboard = () => {
   const dispatch = useDispatch();
   const transactions = useSelector((state) => state.transactions.list);
 
+
+
+
   const sortedTransactions = useMemo(
-    () =>
-      transactions
-        .slice()
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    () => [...transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     [transactions]
   );
 
-  const totalCredit = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.type === "credit")
-        .reduce((sum, t) => sum + t.amount, 0),
-    [transactions]
-  );
-  const totalDebit = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.type === "debit")
-        .reduce((sum, t) => sum + t.amount, 0),
-    [transactions]
-  );
-  const netProfit = useMemo(
-    () => totalCredit - totalDebit,
-    [totalCredit, totalDebit]
-  );
+   const totalCredit = useMemo(() => transactions.filter((t) => t.type === "credit").reduce((sum, t) => sum + t.amount, 0), [transactions]);
+  const totalDebit = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((sum, t) => sum + t.amount, 0), [transactions]);
+  const netProfit = useMemo(() => totalCredit - totalDebit, [totalCredit, totalDebit]);
+
 
   const [credit, setCredit] = useState({
     amount: "",
@@ -161,8 +148,7 @@ const Dashboard = () => {
   }, [editingCell]);
 
   return (
-    <div className="min-h-screen p-6 bg-gray-100  flex flex-col items-center">
-
+    <div className="min-h-screen p-6 bg-[var(--primary)]  flex flex-col items-center">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
         <Card className="p-6 bg-white border border-gray-300 shadow-lg rounded-xl">
           <div className="flex items-center gap-4">
@@ -170,9 +156,9 @@ const Dashboard = () => {
               <TrendingUp className="text-green-700" size={24} />
             </div>
             <div>
-              <p className="text-gray-400 font-medium">Total Credit</p>
+              <p className="text-[var(--secondary)] font-medium">Total Credit</p>
               <p className="text-3xl font-bold text-green-700">
-                ₹{totalCredit}
+                {totalCredit}Rs
               </p>
             </div>
           </div>
@@ -184,8 +170,8 @@ const Dashboard = () => {
               <TrendingDown className="text-red-700" size={24} />
             </div>
             <div>
-              <p className="text-gray-400 font-medium">Total Debit</p>
-              <p className="text-3xl font-bold text-red-700">₹{totalDebit}</p>
+              <p className="text-[var(--secondary)] font-medium">Total Debit</p>
+              <p className="text-3xl font-bold text-red-700">{totalDebit}Rs</p>
             </div>
           </div>
         </Card>
@@ -196,8 +182,8 @@ const Dashboard = () => {
               <Wallet className="text-blue-700" size={24} />
             </div>
             <div>
-              <p className="text-gray-400 font-medium">Net Profit</p>
-              <p className="text-3xl font-bold text-blue-700">₹{netProfit}</p>
+              <p className="text-[var(--secondary)] font-medium">Net Profit</p>
+              <p className="text-3xl font-bold text-blue-700">{netProfit}Rs</p>
             </div>
           </div>
         </Card>
@@ -206,11 +192,13 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl mt-6">
         <Card className="p-6 shadow-lg bg-white">
           <div className="flex justify-center items-center gap-2 mb-4">
-            <TrendingUp className="w-6 h-6 text-green-700" />
+          <div className="w-10 h-10 flex items-center justify-center bg-green-200 rounded-full">
+              <TrendingUp className="text-green-700" size={21} />
+            </div>
             <h3 className="text-xl font-bold text-green-700">Credit Entry</h3>
           </div>
           <div className="flex gap-4">
-            <Input
+          <Input
               ref={creditRefs[0]}
               type="alphanumeric"
               placeholder="Amount"
@@ -231,7 +219,7 @@ const Dashboard = () => {
             <Input
               ref={creditRefs[2]}
               type="date"
-              className="w-full border border-gray-300 bg-white"
+              className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
               value={credit.date}
               onChange={(e) => setCredit({ ...credit, date: e.target.value })}
               onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
@@ -241,11 +229,13 @@ const Dashboard = () => {
 
         <Card className="p-6 shadow-lg bg-white">
           <div className="flex justify-center items-center gap-2 mb-4">
-            <TrendingDown className="w-6 h-6 text-red-700" />
+          <div className="w-10 h-10 flex items-center justify-center bg-red-200 rounded-full">
+              <TrendingDown className="text-red-700" size={21} />
+            </div>
             <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
           </div>
           <div className="flex gap-4">
-            <Input
+          <Input
               ref={debitRefs[0]}
               type="alphanumeric"
               placeholder="Amount"
@@ -268,7 +258,7 @@ const Dashboard = () => {
               ref={debitRefs[2]}
               type="date"
               placeholder="Date"
-              className="w-full border border-gray-300 bg-white"
+              className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
               value={debit.date}
               onChange={(e) => setDebit({ ...debit, date: e.target.value })}
               onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
@@ -278,17 +268,17 @@ const Dashboard = () => {
       </div>
 
       <div className="w-full max-w-6xl mt-6">
-        <h3 className="text-xl font-semibold my-4 text-center">
+        <h3 className="text-xl text-[var(--dark)] font-semibold my-4 text-center">
           Transaction List
         </h3>
         <div className="border-t border-gray-300 p-4">
           <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
-            <thead className="bg-gray-600">
+            <thead className="bg-white">
               <tr>
-                <th className="p-3 text-left text-gray-200">Type</th>
-                <th className="p-3 text-left text-gray-200">Date</th>
-                <th className="p-3 text-left text-gray-200">Description</th>
-                <th className="p-3 text-left text-gray-200">Amount</th>
+                <th className="p-3 text-left text-[var(--secondary)]">Type</th>
+                <th className="p-3 text-left text-[var(--secondary)]">Date</th>
+                <th className="p-3 text-left text-[var(--secondary)]">Description</th>
+                <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -365,7 +355,7 @@ const Dashboard = () => {
                         className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     ) : (
-                      `₹${transaction.amount}`
+                      `Rs${transaction.amount}`
                     )}
                   </td>
                 </tr>

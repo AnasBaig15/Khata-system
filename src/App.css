@@ -1,8 +1,18 @@
 @import "tailwindcss";
+@import '@fontsource/montserrat';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
-    --radius: 0.5rem}
+    --radius: 0.5rem;
+    --primary: #f2f2f2;
+    --secondary: #808597;
+    --tertiary: #A0A5BA;
+    --dark: #363B3F;
+  }
+}
+body {
+  font-family: 'Montserrat', sans-serif;
 }

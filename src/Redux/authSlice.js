@@ -3,7 +3,6 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:3002/users";
 
-// **Signup API**
 export const signupUser = createAsyncThunk(
   "auth/signupUser",
   async (userData, { rejectWithValue }) => {
@@ -28,7 +27,6 @@ export const signupUser = createAsyncThunk(
   }
 );
 
-// **Login API**
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials, { rejectWithValue }) => {
@@ -52,7 +50,6 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-// **Logout API**
 export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
   async (_, { rejectWithValue }) => {
@@ -68,14 +65,13 @@ export const logoutUser = createAsyncThunk(
   }
 );
 
-// **Auth Slice**
 const authSlice = createSlice({
   name: "auth",
   initialState: { user: null, loading: false, error: null },
   reducers: {},
   extraReducers: (builder) => {
     builder
-      // Signup
+
       .addCase(signupUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -89,21 +85,20 @@ const authSlice = createSlice({
         state.error = action.payload;
       })
 
-      // Login
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        localStorage.setItem("token", action.payload.token);
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-
-      // Logout
       .addCase(logoutUser.pending, (state) => {
         state.loading = true;
       })
