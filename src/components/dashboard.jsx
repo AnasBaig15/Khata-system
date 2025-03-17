@@ -1,81 +1,94 @@
-import { useSelector, useDispatch, batch } from "react-redux";
-import { useMemo } from "react";
+import { useMemo, useCallback, useEffect, useState, useRef } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { useDebouncedCallback } from "use-debounce";
-import "../App.css";
 import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { addTransaction, updateTransaction } from "../Redux/transactionSlice";
-
+import { logoutUser } from "../Redux/authSlice";
+import {
+  addTransactionAsync,
+  fetchTransactionsAsync,
+  updateTransactionAsync,
+  fetchProfitAsync,
+} from "../Redux/transactionSlice";
+import Logo from "../images/logo1.png";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const transactions = useSelector((state) => state.transactions.list);
+  const { transactions, profit, status, error } = useSelector((state) => state.transactions);
+  const { user } = useSelector((state) => state.auth);
+  const userId = useSelector((state) => state.auth.user?._id);
 
+  useEffect(() => {
+    if (user?._id) {
+      dispatch(fetchTransactionsAsync(user._id));
+    }
+  }, [dispatch, user?._id]);
 
+  const handleLogout = useCallback(() => {
+    dispatch(logoutUser());
+  }, [dispatch]);
 
+  useEffect(() => {
+    if (userId) {
+      dispatch(fetchProfitAsync(userId));
+    }
+  }, [dispatch, userId]);
 
-  const sortedTransactions = useMemo(
-    () => [...transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-    [transactions]
-  );
-
-   const totalCredit = useMemo(() => transactions.filter((t) => t.type === "credit").reduce((sum, t) => sum + t.amount, 0), [transactions]);
-  const totalDebit = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((sum, t) => sum + t.amount, 0), [transactions]);
-  const netProfit = useMemo(() => totalCredit - totalDebit, [totalCredit, totalDebit]);
-
-
+  const sortedTransactions = useMemo(() => {
+    return [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [transactions]);
+  
   const [credit, setCredit] = useState({
     amount: "",
     description: "",
-    date: "",
+    date: new Date().toISOString().split("T")[0],
   });
-  const [debit, setDebit] = useState({ amount: "", description: "", date: "" });
+  const [debit, setDebit] = useState({
+    amount: "",
+    description: "",
+    date: new Date().toISOString().split("T")[0],
+  });
+
   const creditRefs = [useRef(), useRef(), useRef()];
   const debitRefs = [useRef(), useRef(), useRef()];
-  const editRef = useRef();
 
-  const handleKeyDown = (e, index, refs, type) => {
+  const handleKeyDown = useCallback((e, index, refs, type) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (index < refs.length - 1) {
         refs[index + 1].current.focus();
       } else {
         if (type === "credit") {
-          handleAddTransaction(
-            credit.amount,
-            credit.description,
-            credit.date,
-            "credit"
-          );
+          handleAddTransaction(credit.amount, credit.description, credit.date, "credit");
         } else {
-          handleAddTransaction(
-            debit.amount,
-            debit.description,
-            debit.date,
-            "debit"
-          );
+          handleAddTransaction(debit.amount, debit.description, debit.date, "debit");
         }
       }
     }
-  };
+  }, [credit, debit]);
 
-  const handleAddTransaction = (amount, description, date, type) => {
-    if (!amount || !description || !date) return;
-    batch(() => {
-      dispatch(
-        addTransaction({ description, amount: parseFloat(amount), date, type })
-      );
-      if (type === "credit")
-        setCredit({ amount: "", description: "", date: "" });
-      else setDebit({ amount: "", description: "", date: "" });
-    });
-  };
+  const handleAddTransaction = useCallback(async (amount, description, date, type) => {
+    if (!amount || !description) {
+      alert("Please fill all fields");
+      return;
+    }
+  
+    const timestamp = new Date().toISOString();
+
+    await dispatch(addTransactionAsync({ type, amount, description, date: timestamp }));
+  
+    dispatch(fetchTransactionsAsync(userId));
+    dispatch(fetchProfitAsync(userId));
+  
+    setCredit({ amount: "", description: "", date: timestamp });
+    setDebit({ amount: "", description: "", date: timestamp });
+  }, [dispatch, userId]);
 
   const [editingCell, setEditingCell] = useState(null);
+  const editRef = useRef();
 
-  const startEditing = (index, transaction) => {
+  const startEditing = useCallback((index, transaction) => {
     setEditingCell({
       index,
       fields: {
@@ -85,283 +98,313 @@ const Dashboard = () => {
         type: transaction.type,
       },
     });
-  };
+  }, []);
 
-  const handleInlineChange = useDebouncedCallback((field, value) => {
-    setEditingCell((prev) => ({
-      ...prev,
-      fields: { ...prev.fields, [field]: value },
-    }));
-  }, 300);
+  const handleInlineChange = useDebouncedCallback(
+    (field, value) => {
+      setEditingCell((prev) => ({
+        ...prev,
+        fields: { ...prev.fields, [field]: value },
+      }));
+    },
+    300,
+    [editingCell]
+  );
 
-  const handleInlineKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const { amount, description, date, type } = editingCell.fields;
-      if (!amount || !description || !date) return;
-
-      const transaction = sortedTransactions[editingCell.index];
-      dispatch(
-        updateTransaction({
-          id: transaction.id,
-          amount: parseFloat(amount),
-          description,
-          date,
-          type,
-        })
-      );
-      setEditingCell(null);
+  const saveInlineEdit = useCallback(() => {
+    if (!editingCell) return;
+  
+    const { amount, description, date, type } = editingCell.fields;
+    const transaction = sortedTransactions[editingCell.index];
+  
+    if (!amount || !description || !date || !type) {
+      alert("Please fill all fields");
+      return;
     }
-  };
-  const saveInlineEdit = () => {
-    if (editingCell) {
-      const { amount, description, date, type } = editingCell.fields;
-      if (!amount || !description || !date) return;
+  
+    dispatch(
+      updateTransactionAsync({
+        id: transaction._id,
+        amount,
+        description,
+        date,
+        type,
+      })
+    )
+      .unwrap()
+      .then(() => {
+        console.log("Update successful");
+        setEditingCell(null);
+      })
+      .catch((error) => {
+        console.error("Update failed:", error);
+      });
+  }, [dispatch, editingCell, sortedTransactions]);
 
-      const transaction = sortedTransactions[editingCell.index];
-      dispatch(
-        updateTransaction({
-          id: transaction.id,
-          amount: parseFloat(amount),
-          description,
-          date,
-          type,
-        })
-      );
-      setEditingCell(null);
-    }
-  };
+  const handleInlineKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        saveInlineEdit();
+      }
+    },
+    [saveInlineEdit]
+  );
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        editingCell &&
-        editRef.current &&
-        !editRef.current.contains(event.target)
-      ) {
-        saveInlineEdit();
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
       }
     };
 
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (editingCell && editRef.current && !editRef.current.contains(event.target)) {
+        saveInlineEdit();
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [editingCell]);
+  }, [editingCell, saveInlineEdit]);
 
   return (
-    <div className="min-h-screen p-6 bg-[var(--primary)]  flex flex-col items-center">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
-        <Card className="p-6 bg-white border border-gray-300 shadow-lg rounded-xl">
+    <div className="min-h-screen p-6 bg-[var(--primary)] flex flex-col items-center relative">
+
+<div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20"
+      >
+        <img src={Logo} alt="Logo" className="w-32 h-auto" />
+      </div>
+
+      <button
+        onClick={handleLogout}
+       className="absolute top-6 right-6 bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors z-20"
+      >
+        Logout
+      </button>
+
+      <div className={`${isScrolled ? 'sticky top-0' : 'absolute top-24'} left-6 right-6 z-10 grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300`}>
+        <Card
+          className={`p-6 ${
+            isScrolled
+              ? "bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+              : "bg-white border-gray-300"
+          } shadow-lg rounded-xl`}
+        >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 flex items-center justify-center bg-green-200 rounded-full">
               <TrendingUp className="text-green-700" size={24} />
             </div>
             <div>
               <p className="text-[var(--secondary)] font-medium">Total Credit</p>
-              <p className="text-3xl font-bold text-green-700">
-                {totalCredit}Rs
-              </p>
+              <p className="text-3xl font-bold text-green-700">{profit.totalCredit} Rs</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 bg-white  border border-gray-300 shadow-lg rounded-xl">
+        <Card
+          className={`p-6 ${
+            isScrolled
+              ? "bg-gradient-to-br from-red-50 to-red-100 border-red-200"
+              : "bg-white border-gray-300"
+          } shadow-lg rounded-xl`}
+        >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 flex items-center justify-center bg-red-200 rounded-full">
               <TrendingDown className="text-red-700" size={24} />
             </div>
             <div>
               <p className="text-[var(--secondary)] font-medium">Total Debit</p>
-              <p className="text-3xl font-bold text-red-700">{totalDebit}Rs</p>
+              <p className="text-3xl font-bold text-red-700">{profit.totalDebit} Rs</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 bg-white border border-gray-300 shadow-lg rounded-xl">
+        <Card
+          className={`p-6 ${
+            isScrolled
+              ? "bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
+              : "bg-white border-gray-300"
+          } shadow-lg rounded-xl`}
+        >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 flex items-center justify-center bg-blue-200 rounded-full">
               <Wallet className="text-blue-700" size={24} />
             </div>
             <div>
               <p className="text-[var(--secondary)] font-medium">Net Profit</p>
-              <p className="text-3xl font-bold text-blue-700">{netProfit}Rs</p>
+              <p className="text-3xl font-bold text-blue-700">{profit.profit} Rs</p>
             </div>
           </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl mt-6">
-        <Card className="p-6 shadow-lg bg-white">
-          <div className="flex justify-center items-center gap-2 mb-4">
-          <div className="w-10 h-10 flex items-center justify-center bg-green-200 rounded-full">
-              <TrendingUp className="text-green-700" size={21} />
+      <div className="mt-72 w-full max-w-6xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="p-6 shadow-lg bg-white">
+            <div className="flex justify-center items-center gap-2 mb-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-green-200 rounded-full">
+                <TrendingUp className="text-green-700" size={21} />
+              </div>
+              <h3 className="text-xl font-bold text-green-700">Credit Entry</h3>
             </div>
-            <h3 className="text-xl font-bold text-green-700">Credit Entry</h3>
-          </div>
-          <div className="flex gap-4">
-          <Input
-              ref={creditRefs[0]}
-              type="alphanumeric"
-              placeholder="Amount"
-              value={credit.amount}
-              onChange={(e) => setCredit({ ...credit, amount: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, 0, creditRefs, "credit")}
-            />
-            <Input
-              ref={creditRefs[1]}
-              type="text"
-              placeholder="Description"
-              value={credit.description}
-              onChange={(e) =>
-                setCredit({ ...credit, description: e.target.value })
-              }
-              onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
-            />
-            <Input
-              ref={creditRefs[2]}
-              type="date"
-              className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
-              value={credit.date}
-              onChange={(e) => setCredit({ ...credit, date: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
-            />
-          </div>
-        </Card>
-
-        <Card className="p-6 shadow-lg bg-white">
-          <div className="flex justify-center items-center gap-2 mb-4">
-          <div className="w-10 h-10 flex items-center justify-center bg-red-200 rounded-full">
-              <TrendingDown className="text-red-700" size={21} />
+            <div className="flex gap-4">
+              <Input
+                ref={creditRefs[0]}
+                type="number"
+                placeholder="Amount"
+                value={credit.amount}
+                onChange={(e) => setCredit({ ...credit, amount: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 0, creditRefs, "credit")}
+              />
+              <Input
+                ref={creditRefs[1]}
+                type="text"
+                placeholder="Description"
+                value={credit.description}
+                onChange={(e) => setCredit({ ...credit, description: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
+              />
+              <Input
+                ref={creditRefs[2]}
+                type="date"
+                className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
+                value={credit.date}
+                onChange={(e) => setCredit({ ...credit, date: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
+              />
             </div>
-            <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
-          </div>
-          <div className="flex gap-4">
-          <Input
-              ref={debitRefs[0]}
-              type="alphanumeric"
-              placeholder="Amount"
-              value={debit.amount}
-              onChange={(e) => setDebit({ ...debit, amount: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, 0, debitRefs, "debit")}
-            />
-            <Input
-              ref={debitRefs[1]}
-              type="text"
-              className="text-gray-700 placeholder-black bg-white "
-              placeholder="Description"
-              value={debit.description}
-              onChange={(e) =>
-                setDebit({ ...debit, description: e.target.value })
-              }
-              onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
-            />
-            <Input
-              ref={debitRefs[2]}
-              type="date"
-              placeholder="Date"
-              className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
-              value={debit.date}
-              onChange={(e) => setDebit({ ...debit, date: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
-            />
-          </div>
-        </Card>
-      </div>
+          </Card>
 
-      <div className="w-full max-w-6xl mt-6">
-        <h3 className="text-xl text-[var(--dark)] font-semibold my-4 text-center">
-          Transaction List
-        </h3>
-        <div className="border-t border-gray-300 p-4">
-          <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
-            <thead className="bg-white">
-              <tr>
-                <th className="p-3 text-left text-[var(--secondary)]">Type</th>
-                <th className="p-3 text-left text-[var(--secondary)]">Date</th>
-                <th className="p-3 text-left text-[var(--secondary)]">Description</th>
-                <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTransactions.map((transaction, index) => (
-                <tr
-                  key={index}
-                  className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => startEditing(index, transaction)}
-                >
-                  <td className="p-3">
-                    {editingCell?.index === index ? (
-                      <select
-                        value={editingCell.fields.type}
-                        onChange={(e) =>
-                          handleInlineChange("type", e.target.value)
-                        }
-                        onKeyDown={handleInlineKeyDown}
-                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="credit">Credit</option>
-                        <option value="debit">Debit</option>
-                      </select>
-                    ) : (
-                      <span
-                        className={`font-semibold ${
-                          transaction.type === "credit"
-                            ? "text-green-700"
-                            : "text-red-700"
-                        }`}
-                      >
-                        {transaction.type}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {editingCell?.index === index ? (
-                      <Input
-                        type="date"
-                        value={editingCell.fields.date}
-                        onChange={(e) =>
-                          handleInlineChange("date", e.target.value)
-                        }
-                        onKeyDown={handleInlineKeyDown}
-                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      transaction.date
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {editingCell?.index === index ? (
-                      <Input
-                        type="text"
-                        value={editingCell.fields.description}
-                        onChange={(e) =>
-                          handleInlineChange("description", e.target.value)
-                        }
-                        onKeyDown={handleInlineKeyDown}
-                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      transaction.description
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {editingCell?.index === index ? (
-                      <Input
-                        type="alphanumeric"
-                        value={editingCell.fields.amount}
-                        onChange={(e) =>
-                          handleInlineChange("amount", e.target.value)
-                        }
-                        onKeyDown={handleInlineKeyDown}
-                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      `Rs${transaction.amount}`
-                    )}
-                  </td>
+          <Card className="p-6 shadow-lg bg-white">
+            <div className="flex justify-center items-center gap-2 mb-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-red-200 rounded-full">
+                <TrendingDown className="text-red-700" size={21} />
+              </div>
+              <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
+            </div>
+            <div className="flex gap-4">
+              <Input
+                ref={debitRefs[0]}
+                type="number"
+                placeholder="Amount"
+                value={debit.amount}
+                onChange={(e) => setDebit({ ...debit, amount: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 0, debitRefs, "debit")}
+              />
+              <Input
+                ref={debitRefs[1]}
+                type="text"
+                placeholder="Description"
+                value={debit.description}
+                onChange={(e) => setDebit({ ...debit, description: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
+              />
+              <Input
+                ref={debitRefs[2]}
+                type="date"
+                className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
+                value={debit.date}
+                onChange={(e) => setDebit({ ...debit, date: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
+              />
+            </div>
+          </Card>
+        </div>
+
+        <div className="w-full mt-6">
+          <h3 className="text-xl text-[var(--dark)] font-semibold my-4 text-center">
+            Transaction List
+          </h3>
+          <div className="border-t border-gray-300 p-4">
+            <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
+              <thead className="bg-white">
+                <tr>
+                  <th className="p-3 text-left text-[var(--secondary)]">Type</th>
+                  <th className="p-3 text-left text-[var(--secondary)]">Date</th>
+                  <th className="p-3 text-left text-[var(--secondary)]">Description</th>
+                  <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+              {sortedTransactions.map((transaction, index) => (
+                  <tr
+                    key={transaction._id}
+                    className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => startEditing(index, transaction)}
+                  >
+                    <td className="p-3">
+                      {editingCell?.index === index ? (
+                        <select
+                          value={editingCell.fields.type}
+                          onChange={(e) => handleInlineChange("type", e.target.value)}
+                          onKeyDown={handleInlineKeyDown}
+                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="credit">Credit</option>
+                          <option value="debit">Debit</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`font-semibold ${
+                            transaction.type === "credit" ? "text-green-700" : "text-red-700"
+                          }`}
+                        >
+                          {transaction.type}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {editingCell?.index === index ? (
+                        <Input
+                          type="date"
+                          value={editingCell.fields.date}
+                          onChange={(e) => handleInlineChange("date", e.target.value)}
+                          onKeyDown={handleInlineKeyDown}
+                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        new Date(transaction.date).toLocaleDateString()
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {editingCell?.index === index ? (
+                        <Input
+                          type="text"
+                          value={editingCell.fields.description}
+                          onChange={(e) => handleInlineChange("description", e.target.value)}
+                          onKeyDown={handleInlineKeyDown}
+                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        transaction.description
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {editingCell?.index === index ? (
+                        <Input
+                          type="number"
+                          value={editingCell.fields.amount}
+                          onChange={(e) => handleInlineChange("amount", e.target.value)}
+                          onKeyDown={handleInlineKeyDown}
+                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        `Rs${transaction.amount}`
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
