@@ -15,7 +15,7 @@ import Logo from "../images/logo1.png";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { transactions, profit, status, error } = useSelector((state) => state.transactions);
+  const { transactions, profit} = useSelector((state) => state.transactions);
   const { user } = useSelector((state) => state.auth);
   const userId = useSelector((state) => state.auth.user?._id);
 
