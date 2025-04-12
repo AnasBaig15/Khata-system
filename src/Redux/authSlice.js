@@ -2,7 +2,8 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const API_BASE_URL = "http://localhost:3002/users";
+const API_BASE_URL = "https://khatasystem.martendigitals.com/api/v1/users";
+// const LOCAL_AUTH_URL = "http://localhost:3002/api/v1/users"
 
 export const signupUser = createAsyncThunk(
   "auth/signupUser",
@@ -144,6 +145,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       });
+      
   },
 });
 

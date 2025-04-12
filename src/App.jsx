@@ -8,7 +8,7 @@ import { lazy, Suspense } from "react";
 import { initializeAuth } from "./Redux/authSlice";
 
 const Dashboard = lazy(() => import("./components/dashboard"));
-const Signup = lazy(() => import("./components/signUp"));
+const Signup = lazy(() => import("./components/Signup"));
 const Login = lazy(() => import("./components/login"));
 
 const ProtectedRoute = ({ children }) => {

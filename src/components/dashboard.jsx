@@ -15,9 +15,11 @@ import Logo from "../images/logo1.png";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { transactions, profit} = useSelector((state) => state.transactions);
+  const { transactions, profit } = useSelector((state) => state.transactions);
   const { user } = useSelector((state) => state.auth);
   const userId = useSelector((state) => state.auth.user?._id);
+
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
     if (user?._id) {
@@ -36,9 +38,21 @@ const Dashboard = () => {
   }, [dispatch, userId]);
 
   const sortedTransactions = useMemo(() => {
-    return [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    return [...transactions].sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
   }, [transactions]);
-  
+
+  const filteredTransactions = useMemo(() => {
+    if (filter === "credit") {
+      return sortedTransactions.filter((t) => t.type === "credit");
+    } else if (filter === "debit") {
+      return sortedTransactions.filter((t) => t.type === "debit");
+    } else {
+      return sortedTransactions;
+    }
+  }, [sortedTransactions, filter]);
+
   const [credit, setCredit] = useState({
     amount: "",
     description: "",
@@ -53,37 +67,55 @@ const Dashboard = () => {
   const creditRefs = [useRef(), useRef(), useRef()];
   const debitRefs = [useRef(), useRef(), useRef()];
 
-  const handleKeyDown = useCallback((e, index, refs, type) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (index < refs.length - 1) {
-        refs[index + 1].current.focus();
-      } else {
-        if (type === "credit") {
-          handleAddTransaction(credit.amount, credit.description, credit.date, "credit");
+  const handleKeyDown = useCallback(
+    (e, index, refs, type) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (index < refs.length - 1) {
+          refs[index + 1].current.focus();
         } else {
-          handleAddTransaction(debit.amount, debit.description, debit.date, "debit");
+          if (type === "credit") {
+            handleAddTransaction(
+              credit.amount,
+              credit.description,
+              credit.date,
+              "credit"
+            );
+          } else {
+            handleAddTransaction(
+              debit.amount,
+              debit.description,
+              debit.date,
+              "debit"
+            );
+          }
         }
       }
-    }
-  }, [credit, debit]);
+    },
+    [credit, debit]
+  );
 
-  const handleAddTransaction = useCallback(async (amount, description, date, type) => {
-    if (!amount || !description) {
-      alert("Please fill all fields");
-      return;
-    }
-  
-    const timestamp = new Date().toISOString();
+  const handleAddTransaction = useCallback(
+    async (amount, description, date, type) => {
+      if (!amount || !description) {
+        alert("Please fill all fields");
+        return;
+      }
 
-    await dispatch(addTransactionAsync({ type, amount, description, date: timestamp }));
-  
-    dispatch(fetchTransactionsAsync(userId));
-    dispatch(fetchProfitAsync(userId));
-  
-    setCredit({ amount: "", description: "", date: timestamp });
-    setDebit({ amount: "", description: "", date: timestamp });
-  }, [dispatch, userId]);
+      const timestamp = new Date().toISOString();
+
+      await dispatch(
+        addTransactionAsync({ type, amount, description, date: timestamp })
+      );
+
+      dispatch(fetchTransactionsAsync(userId));
+      dispatch(fetchProfitAsync(userId));
+
+      setCredit({ amount: "", description: "", date: timestamp });
+      setDebit({ amount: "", description: "", date: timestamp });
+    },
+    [dispatch, userId]
+  );
 
   const [editingCell, setEditingCell] = useState(null);
   const editRef = useRef();
@@ -113,15 +145,15 @@ const Dashboard = () => {
 
   const saveInlineEdit = useCallback(() => {
     if (!editingCell) return;
-  
+
     const { amount, description, date, type } = editingCell.fields;
     const transaction = sortedTransactions[editingCell.index];
-  
+
     if (!amount || !description || !date || !type) {
       alert("Please fill all fields");
       return;
     }
-  
+
     dispatch(
       updateTransactionAsync({
         id: transaction._id,
@@ -150,6 +182,7 @@ const Dashboard = () => {
     },
     [saveInlineEdit]
   );
+
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -167,7 +200,11 @@ const Dashboard = () => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (editingCell && editRef.current && !editRef.current.contains(event.target)) {
+      if (
+        editingCell &&
+        editRef.current &&
+        !editRef.current.contains(event.target)
+      ) {
         saveInlineEdit();
       }
     };
@@ -177,20 +214,22 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen p-6 bg-[var(--primary)] flex flex-col items-center relative">
-
-<div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20"
-      >
+      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20">
         <img src={Logo} alt="Logo" className="w-32 h-auto" />
       </div>
 
       <button
         onClick={handleLogout}
-       className="absolute top-6 right-6 bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors z-20"
+        className="absolute top-6 right-6 bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors z-20"
       >
         Logout
       </button>
 
-      <div className={`${isScrolled ? 'sticky top-0' : 'absolute top-24'} left-6 right-6 z-10 grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300`}>
+      <div
+        className={`${
+          isScrolled ? "sticky top-0" : "absolute top-30"
+        } left-6 right-6 z-10 grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300`}
+      >
         <Card
           className={`p-6 ${
             isScrolled
@@ -203,8 +242,12 @@ const Dashboard = () => {
               <TrendingUp className="text-green-700" size={24} />
             </div>
             <div>
-              <p className="text-[var(--secondary)] font-medium">Total Credit</p>
-              <p className="text-3xl font-bold text-green-700">{profit.totalCredit} Rs</p>
+              <p className="text-[var(--secondary)] font-medium">
+                Total Credit
+              </p>
+              <p className="text-3xl font-bold text-green-700">
+                {profit.totalCredit} Rs
+              </p>
             </div>
           </div>
         </Card>
@@ -222,7 +265,9 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-[var(--secondary)] font-medium">Total Debit</p>
-              <p className="text-3xl font-bold text-red-700">{profit.totalDebit} Rs</p>
+              <p className="text-3xl font-bold text-red-700">
+                {profit.totalDebit} Rs
+              </p>
             </div>
           </div>
         </Card>
@@ -240,13 +285,15 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-[var(--secondary)] font-medium">Net Profit</p>
-              <p className="text-3xl font-bold text-blue-700">{profit.profit} Rs</p>
+              <p className="text-3xl font-bold text-blue-700">
+                {profit.profit} Rs
+              </p>
             </div>
           </div>
         </Card>
       </div>
 
-      <div className="mt-72 w-full max-w-6xl">
+      <div className="mt-55 w-full max-w-6xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="p-6 shadow-lg bg-white">
             <div className="flex justify-center items-center gap-2 mb-4">
@@ -261,7 +308,9 @@ const Dashboard = () => {
                 type="number"
                 placeholder="Amount"
                 value={credit.amount}
-                onChange={(e) => setCredit({ ...credit, amount: e.target.value })}
+                onChange={(e) =>
+                  setCredit({ ...credit, amount: e.target.value })
+                }
                 onKeyDown={(e) => handleKeyDown(e, 0, creditRefs, "credit")}
               />
               <Input
@@ -269,7 +318,9 @@ const Dashboard = () => {
                 type="text"
                 placeholder="Description"
                 value={credit.description}
-                onChange={(e) => setCredit({ ...credit, description: e.target.value })}
+                onChange={(e) =>
+                  setCredit({ ...credit, description: e.target.value })
+                }
                 onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
               />
               <Input
@@ -304,7 +355,9 @@ const Dashboard = () => {
                 type="text"
                 placeholder="Description"
                 value={debit.description}
-                onChange={(e) => setDebit({ ...debit, description: e.target.value })}
+                onChange={(e) =>
+                  setDebit({ ...debit, description: e.target.value })
+                }
                 onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
               />
               <Input
@@ -320,21 +373,63 @@ const Dashboard = () => {
         </div>
 
         <div className="w-full mt-6">
-          <h3 className="text-xl text-[var(--dark)] font-semibold my-4 text-center">
-            Transaction List
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  filter === 'all'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilter('credit')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  filter === 'credit'
+                    ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                Credit
+              </button>
+              <button
+                onClick={() => setFilter('debit')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  filter === 'debit'
+                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                Debit
+              </button>
+            </div>
+            <h3 className="text-xl text-[var(--dark)] font-semibold flex-1 text-center">
+              Transaction List
+            </h3>
+          </div>
           <div className="border-t border-gray-300 p-4">
             <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
               <thead className="bg-white">
                 <tr>
-                  <th className="p-3 text-left text-[var(--secondary)]">Type</th>
-                  <th className="p-3 text-left text-[var(--secondary)]">Date</th>
-                  <th className="p-3 text-left text-[var(--secondary)]">Description</th>
-                  <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
+                  <th className="p-3 text-left text-[var(--secondary)]">
+                    Type
+                  </th>
+                  <th className="p-3 text-left text-[var(--secondary)]">
+                    Date
+                  </th>
+                  <th className="p-3 text-left text-[var(--secondary)]">
+                    Description
+                  </th>
+                  <th className="p-3 text-left text-[var(--secondary)]">
+                    Amount
+                  </th>
                 </tr>
               </thead>
               <tbody>
-              {sortedTransactions.map((transaction, index) => (
+                {filteredTransactions.map((transaction, index) => (
                   <tr
                     key={transaction._id}
                     className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
@@ -344,7 +439,9 @@ const Dashboard = () => {
                       {editingCell?.index === index ? (
                         <select
                           value={editingCell.fields.type}
-                          onChange={(e) => handleInlineChange("type", e.target.value)}
+                          onChange={(e) =>
+                            handleInlineChange("type", e.target.value)
+                          }
                           onKeyDown={handleInlineKeyDown}
                           className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
@@ -354,7 +451,9 @@ const Dashboard = () => {
                       ) : (
                         <span
                           className={`font-semibold ${
-                            transaction.type === "credit" ? "text-green-700" : "text-red-700"
+                            transaction.type === "credit"
+                              ? "text-green-700"
+                              : "text-red-700"
                           }`}
                         >
                           {transaction.type}
@@ -366,7 +465,9 @@ const Dashboard = () => {
                         <Input
                           type="date"
                           value={editingCell.fields.date}
-                          onChange={(e) => handleInlineChange("date", e.target.value)}
+                          onChange={(e) =>
+                            handleInlineChange("date", e.target.value)
+                          }
                           onKeyDown={handleInlineKeyDown}
                           className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -379,7 +480,9 @@ const Dashboard = () => {
                         <Input
                           type="text"
                           value={editingCell.fields.description}
-                          onChange={(e) => handleInlineChange("description", e.target.value)}
+                          onChange={(e) =>
+                            handleInlineChange("description", e.target.value)
+                          }
                           onKeyDown={handleInlineKeyDown}
                           className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -392,7 +495,9 @@ const Dashboard = () => {
                         <Input
                           type="number"
                           value={editingCell.fields.amount}
-                          onChange={(e) => handleInlineChange("amount", e.target.value)}
+                          onChange={(e) =>
+                            handleInlineChange("amount", e.target.value)
+                          }
                           onKeyDown={handleInlineKeyDown}
                           className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />

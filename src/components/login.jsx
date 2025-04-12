@@ -3,6 +3,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { loginUser } from "../Redux/authSlice";
 import { useNavigate } from "react-router-dom";
 import Logo from "../images/logo1.png";
+import "../signup.css";
+import { Eye, EyeOff } from "lucide-react";
 
 function Login() {
   const dispatch = useDispatch();
@@ -11,6 +13,7 @@ function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -24,72 +27,59 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8 space-y-6">
-        <div className="flex justify-center">
-          <img src={Logo} alt="Logo" className="h-16 w-auto" />
+    <div className="signup-container">
+      <div className="signup-card">
+        <div className="signup-logo">
+          <img src={Logo} alt="Logo" />
         </div>
+        <h2 className="signup-title">Welcome Back!</h2>
+        <p className="signup-subtitle">Sign in to continue</p>
 
-        <h2 className="text-center text-2xl font-semibold text-gray-800">
-          Welcome Back!
-        </h2>
-        <p className="text-center text-gray-500">Sign in to continue</p>
-
-        <form className="space-y-4" onSubmit={handleLogin}>
+        <form className="signup-form" onSubmit={handleLogin}>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Email Address
-            </label>
+            <label className="signup-label">Email Address</label>
             <input
               type="email"
               name="email"
-              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
+              className="signup-input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
-            />
-          </div>
-
-          <div className="flex justify-between items-center">
-            <a
-              href="#"
-              className="text-sm text-gray-600 hover:text-gray-800 transition"
-            >
-              Forgot your password?
-            </a>
+            <label className="signup-label">Password</label>
+            <div className="input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="signup-input password-input"
+              />
+              <span
+                className="password-toggle-icon"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </span>
+            </div>
           </div>
 
           <button
             type="submit"
-            className="w-full py-2 bg-gray-800 text-white font-medium rounded-lg shadow-md hover:bg-gray-900 transition"
+            className="signup-button"
             disabled={loading}
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-gray-600 text-sm">
+        <p className="signup-footer">
           Don’t have an account?{" "}
-          <a
-            href="/register"
-            className="text-gray-800 font-medium hover:underline"
-          >
+          <a href="/register" className="register-link">
             Register here
           </a>
         </p>
@@ -99,3 +89,59 @@ function Login() {
 }
 
 export default Login;
+
+{/* <div className="container">
+<div className="card">
+  <div className="logo">
+    <img src={Logo} alt="Logo" />
+  </div>
+
+  <h2 className="title">Welcome Back!</h2>
+  <p className="subtitle">Sign in to continue</p>
+
+  <form className="form" onSubmit={handleLogin}>
+    <div>
+      <label className="label">Email Address</label>
+      <input
+        type="email"
+        name="email"
+        autoComplete="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="input"
+      />
+    </div>
+
+    <div>
+      <label className="label">Password</label>
+      <input
+        type="password"
+        name="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="input"
+      />
+    </div>
+
+    <div>
+      <a href="#" className="forgot-password">
+        Forgot your password?
+      </a>
+    </div>
+
+    <button type="submit" className="button" disabled={loading}>
+      {loading ? "Signing in..." : "Sign in"}
+    </button>
+  </form>
+
+  <p className="register-text">
+    Don’t have an account?{" "}
+    <a href="/register" className="register-link">
+      Register here
+    </a>
+  </p>
+</div>
+</div> */}
