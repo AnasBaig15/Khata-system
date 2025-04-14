@@ -3,7 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 const API_URL = "https://khatasystem.martendigitals.com/api/v1/transactions";
-const EDIT_URL = "https://khatasystem.martendigitals.com/api/v1/transactions";
+const EDIT_URL = "https://khatasystem.martendigitals.com/api/v1/edit";
 const PROFIT_URL = "https://khatasystem.martendigitals.com/api/v1";
 
 export const fetchTransactionsAsync = createAsyncThunk(
@@ -76,11 +76,11 @@ const transactionSlice = createSlice({
     profit: { totalCredit: 0, totalDebit: 0, balance: 0 },
     loading: false,
     error: null,
-    pendingTransactions: [], // Track pending optimistic updates
-    pendingUpdates: {}, // Track pending updates by ID
+    pendingTransactions: [],
+    pendingUpdates: {},
   },
   reducers: {
-    // Optimistically add a transaction
+
     addTransactionOptimistic: (state, action) => {
       const tempId = `temp-${Date.now()}`;
       state.transactions.unshift({
@@ -89,7 +89,6 @@ const transactionSlice = createSlice({
         isOptimistic: true,
       });
       state.pendingTransactions.push(tempId);
-      // Update profit calculations optimistically
       if (action.payload.type === "credit") {
         state.profit.totalCredit += Number(action.payload.amount);
         state.profit.balance += Number(action.payload.amount);
@@ -98,7 +97,6 @@ const transactionSlice = createSlice({
         state.profit.balance -= Number(action.payload.amount);
       }
     },
-    // Optimistically update a transaction
     updateTransactionOptimistic: (state, action) => {
       const { id, updates } = action.payload;
       const index = state.transactions.findIndex(t => t._id === id);
@@ -106,7 +104,6 @@ const transactionSlice = createSlice({
       if (index !== -1) {
         const originalTransaction = state.transactions[index];
         
-        // Store original values in case we need to rollback
         if (!state.pendingUpdates[id]) {
           state.pendingUpdates[id] = {
             original: { ...originalTransaction },
@@ -114,21 +111,18 @@ const transactionSlice = createSlice({
           };
         }
         
-        // Apply the updates
         state.transactions[index] = {
           ...state.transactions[index],
           ...updates,
           isOptimistic: true
         };
-        
-        // Recalculate profit if amount or type changed
+
         if (updates.amount !== undefined || updates.type !== undefined) {
           const oldAmount = Number(originalTransaction.amount);
           const newAmount = updates.amount !== undefined ? 
             Number(updates.amount) : oldAmount;
           const newType = updates.type || originalTransaction.type;
           
-          // Remove old values from profit
           if (originalTransaction.type === "credit") {
             state.profit.totalCredit -= oldAmount;
             state.profit.balance -= oldAmount;
@@ -136,8 +130,7 @@ const transactionSlice = createSlice({
             state.profit.totalDebit -= oldAmount;
             state.profit.balance += oldAmount;
           }
-          
-          // Add new values to profit
+
           if (newType === "credit") {
             state.profit.totalCredit += newAmount;
             state.profit.balance += newAmount;
@@ -148,19 +141,17 @@ const transactionSlice = createSlice({
         }
       }
     },
-    // Rollback a failed optimistic update
+
     rollbackTransaction: (state, action) => {
       const { tempId, id, error, transaction } = action.payload;
     
-      // Rollback add transaction
       if (tempId) {
         const index = state.transactions.findIndex((t) => t._id === tempId);
         if (index !== -1) {
           const t = state.transactions[index];
           state.transactions.splice(index, 1);
           state.pendingTransactions = state.pendingTransactions.filter((i) => i !== tempId);
-    
-          // Rollback profit
+
           if (t.type === "credit") {
             state.profit.totalCredit -= Number(t.amount);
             state.profit.balance -= Number(t.amount);
@@ -170,15 +161,13 @@ const transactionSlice = createSlice({
           }
         }
       }
-    
-      // Rollback update transaction
+
       if (id && state.pendingUpdates[id]) {
         const { original } = state.pendingUpdates[id];
         const index = state.transactions.findIndex((t) => t._id === id);
         if (index !== -1) {
           state.transactions[index] = original;
     
-          // Recalculate profit
           state.profit.totalCredit = state.transactions
             .filter((t) => t.type === "credit")
             .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -205,7 +194,6 @@ const transactionSlice = createSlice({
       .addCase(fetchTransactionsAsync.fulfilled, (state, action) => {
         state.loading = false;
         state.transactions = action.payload;
-        // Filter out any pending transactions that were successfully saved
         state.pendingTransactions = state.pendingTransactions.filter(
           tempId => !action.payload.some(t => t._id === tempId)
         );
@@ -228,7 +216,6 @@ const transactionSlice = createSlice({
       .addCase(addTransactionAsync.fulfilled, (state, action) => {
         const realTransaction = action.payload;
         
-        // Find and replace the optimistic transaction with the real one using matching content (amount, description, etc.)
         const optimisticIndex = state.transactions.findIndex(
           (t) =>
             t.isOptimistic &&
@@ -247,26 +234,50 @@ const transactionSlice = createSlice({
           const tempId = state.transactions[optimisticIndex]._id;
           state.pendingTransactions = state.pendingTransactions.filter((id) => id !== tempId);
         } else {
-          // If not found, just add normally
           state.transactions.unshift(realTransaction);
         }
       })
       .addCase(addTransactionAsync.rejected, (state, action) => {
-        // The error will be handled by the rollback action dispatched from the component
         state.error = action.payload;
       })
       .addCase(updateTransactionAsync.fulfilled, (state, action) => {
-        // Update the transaction with server response
-        const updatedTransaction = action.payload;
-        const index = state.transactions.findIndex(t => t._id === updatedTransaction._id);
-        
+        const updated = action.payload;
+        const index = state.transactions.findIndex(t => t._id === updated._id);
+      
         if (index !== -1) {
-          state.transactions[index] = updatedTransaction;
-          delete state.pendingUpdates[updatedTransaction._id];
+          const wasOptimistic = state.transactions[index].isOptimistic;
+          const old = state.pendingUpdates[updated._id]?.original || state.transactions[index];
+      
+          // Only recalculate if it wasn't done optimistically
+          if (!wasOptimistic && old) {
+            if (old.type === "credit") {
+              state.profit.totalCredit -= Number(old.amount);
+              state.profit.balance -= Number(old.amount);
+            } else {
+              state.profit.totalDebit -= Number(old.amount);
+              state.profit.balance += Number(old.amount);
+            }
+      
+            if (updated.type === "credit") {
+              state.profit.totalCredit += Number(updated.amount);
+              state.profit.balance += Number(updated.amount);
+            } else {
+              state.profit.totalDebit += Number(updated.amount);
+              state.profit.balance -= Number(updated.amount);
+            }
+          }
+      
+          // Replace transaction
+          state.transactions[index] = { ...updated, isOptimistic: false };
+      
+          // Cleanup pending update
+          delete state.pendingUpdates[updated._id];
         }
       })
+      
+      
+      
       .addCase(updateTransactionAsync.rejected, (state, action) => {
-        // The error will be handled by the rollback action dispatched from the component
         state.error = action.payload;
       });
   },

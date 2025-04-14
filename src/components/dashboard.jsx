@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useDebouncedCallback } from "use-debounce";
-import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { logoutUser } from "../Redux/authSlice";
@@ -22,8 +22,13 @@ const Dashboard = () => {
   const { user } = useSelector((state) => state.auth);
   const userId = useSelector((state) => state.auth.user?._id);
   const token = useSelector((state) => state.auth.token);
-
   const [filter, setFilter] = useState("all");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const transactionsPerPage = 4;
+ 
+
+
 
   useEffect(() => {
     if (user?._id) {
@@ -48,14 +53,31 @@ const Dashboard = () => {
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    if (filter === "credit") {
-      return sortedTransactions.filter((t) => t.type === "credit");
+    let filtered = sortedTransactions;
+  
+    if (selectedDate) {
+      filtered = filtered.filter(
+        (t) => new Date(t.date).toISOString().split("T")[0] === selectedDate
+      );
+    } else if (filter === "credit") {
+      filtered = filtered.filter((t) => t.type === "credit");
     } else if (filter === "debit") {
-      return sortedTransactions.filter((t) => t.type === "debit");
-    } else {
-      return sortedTransactions;
+      filtered = filtered.filter((t) => t.type === "debit");
     }
-  }, [sortedTransactions, filter]);
+  
+    return filtered;
+  }, [sortedTransactions, filter, selectedDate]);
+  
+  const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * transactionsPerPage;
+    return filteredTransactions.slice(start, start + transactionsPerPage);
+  }, [filteredTransactions, currentPage]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, selectedDate]);
+  
 
   const [credit, setCredit] = useState({
     amount: "",
@@ -110,25 +132,21 @@ const Dashboard = () => {
       const transactionData = { type, amount, description, date: timestamp };
 
       try {
-        // Optimistically update UI
         dispatch(addTransactionOptimistic(transactionData));
         
-        // Clear form
         if (type === "credit") {
           setCredit({ amount: "", description: "", date: timestamp });
         } else {
           setDebit({ amount: "", description: "", date: timestamp });
         }
 
-        // Send to server
         const result = await dispatch(addTransactionAsync(transactionData)).unwrap();
         
-        // Refetch to ensure consistency (optional)
         dispatch(fetchTransactionsAsync(userId));
         dispatch(fetchProfitAsync(userId));
         
       } catch (error) {
-        // Rollback on error
+
         const tempId = pendingTransactions.find(id => 
           transactions.some(t => t._id === id && t.description === description)
         );
@@ -181,13 +199,11 @@ const Dashboard = () => {
     }
 
     try {
-      // Optimistically update UI
       dispatch(updateTransactionOptimistic({
         id: transaction._id,
         updates: { amount, description, date: new Date(date).toISOString(), type }
       }));
 
-      // Send to server
       const result = await dispatch(
         updateTransactionAsync({
           id: transaction._id,
@@ -200,7 +216,6 @@ const Dashboard = () => {
 
       setEditingCell(null);
     } catch (error) {
-      // Rollback on error
       dispatch(rollbackTransaction({ 
         id: transaction._id,
         error: error.message || "Failed to update transaction"
@@ -282,7 +297,7 @@ const Dashboard = () => {
                 Total Credit
               </p>
               <p className="text-3xl font-bold text-green-700">
-                {profit.totalCredit} Rs
+              {(profit?.totalCredit ?? 0).toLocaleString('en-IN')} Rs
               </p>
             </div>
           </div>
@@ -302,7 +317,7 @@ const Dashboard = () => {
             <div>
               <p className="text-[var(--secondary)] font-medium">Total Debit</p>
               <p className="text-3xl font-bold text-red-700">
-                {profit.totalDebit} Rs
+              {(profit?.totalDebit ?? 0).toLocaleString('en-IN')} Rs
               </p>
             </div>
           </div>
@@ -322,7 +337,7 @@ const Dashboard = () => {
             <div>
               <p className="text-[var(--secondary)] font-medium">Net Profit</p>
               <p className="text-3xl font-bold text-blue-700">
-                {profit.profit} Rs
+              {(profit?.profit ?? 0).toLocaleString('en-IN')} Rs
               </p>
             </div>
           </div>
@@ -409,144 +424,180 @@ const Dashboard = () => {
         </div>
 
         <div className="w-full mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  filter === 'all'
-                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilter('credit')}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  filter === 'credit'
-                    ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                }`}
-              >
-                Credit
-              </button>
-              <button
-                onClick={() => setFilter('debit')}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  filter === 'debit'
-                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                }`}
-              >
-                Debit
-              </button>
-            </div>
-            <h3 className="text-xl text-[var(--dark)] font-semibold flex-1 text-center">
-              Transaction List
-            </h3>
-          </div>
-          <div className="border-t border-gray-300 p-4">
-            <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
-              <thead className="bg-white">
-                <tr>
-                  <th className="p-3 text-left text-[var(--secondary)]">
-                    Type
-                  </th>
-                  <th className="p-3 text-left text-[var(--secondary)]">
-                    Date
-                  </th>
-                  <th className="p-3 text-left text-[var(--secondary)]">
-                    Description
-                  </th>
-                  <th className="p-3 text-left text-[var(--secondary)]">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map((transaction, index) => (
-                  <tr
-                    key={transaction._id}
-                    className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => startEditing(index, transaction)}
-                  >
-                    <td className="p-3">
-                      {editingCell?.index === index ? (
-                        <select
-                          value={editingCell.fields.type}
-                          onChange={(e) =>
-                            handleInlineChange("type", e.target.value)
-                          }
-                          onKeyDown={handleInlineKeyDown}
-                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="credit">Credit</option>
-                          <option value="debit">Debit</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`font-semibold ${
-                            transaction.type === "credit"
-                              ? "text-green-700"
-                              : "text-red-700"
-                          }`}
-                        >
-                          {transaction.type}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {editingCell?.index === index ? (
-                        <Input
-                          type="date"
-                          value={editingCell.fields.date}
-                          onChange={(e) =>
-                            handleInlineChange("date", e.target.value)
-                          }
-                          onKeyDown={handleInlineKeyDown}
-                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        new Date(transaction.date).toLocaleDateString()
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {editingCell?.index === index ? (
-                        <Input
-                          type="text"
-                          value={editingCell.fields.description}
-                          onChange={(e) =>
-                            handleInlineChange("description", e.target.value)
-                          }
-                          onKeyDown={handleInlineKeyDown}
-                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        transaction.description
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {editingCell?.index === index ? (
-                        <Input
-                          type="number"
-                          value={editingCell.fields.amount}
-                          onChange={(e) =>
-                            handleInlineChange("amount", e.target.value)
-                          }
-                          onKeyDown={handleInlineKeyDown}
-                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        `Rs${transaction.amount}`
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+
+  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <div className="flex gap-2">
+      <button
+        onClick={() => { setFilter('all'); setSelectedDate(''); }}
+        className={`px-4 py-2 rounded-lg transition-all ${
+          filter === 'all' && !selectedDate
+            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+        }`}
+      >
+        All
+      </button>
+      <button
+        onClick={() => { setFilter('credit'); setSelectedDate(''); }}
+        className={`px-4 py-2 rounded-lg transition-all ${
+          filter === 'credit' && !selectedDate
+            ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
+            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+        }`}
+      >
+        Credit
+      </button>
+      <button
+        onClick={() => { setFilter('debit'); setSelectedDate(''); }}
+        className={`px-4 py-2 rounded-lg transition-all ${
+          filter === 'debit' && !selectedDate
+            ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
+            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+        }`}
+      >
+        Debit
+      </button>
+    </div>
+
+    <h3 className="text-xl text-[var(--dark)] font-semibold flex-1 text-center">
+      Transaction List
+    </h3>
+
+    <div className="flex gap-2 items-center">
+      <Input
+        type="date"
+        value={selectedDate}
+        onChange={(e) => setSelectedDate(e.target.value)}
+         className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
+      />
+      {selectedDate && (
+        <button
+          onClick={() => setSelectedDate("")}
+          className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  </div>
+
+  <div className="border-t border-gray-300 p-4">
+    <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
+      <thead className="bg-white">
+        <tr>
+          <th className="p-3 text-left text-[var(--secondary)]">Type</th>
+          <th className="p-3 text-left text-[var(--secondary)]">Date</th>
+          <th className="p-3 text-left text-[var(--secondary)]">Description</th>
+          <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {paginatedTransactions.map((transaction, index) => (
+          <tr
+            key={transaction._id}
+            className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() =>
+              startEditing(
+                (currentPage - 1) * transactionsPerPage + index,
+                transaction
+              )
+            }
+          >
+            <td className="p-3">
+              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+                <select
+                  value={editingCell.fields.type}
+                  onChange={(e) => handleInlineChange("type", e.target.value)}
+                  onKeyDown={handleInlineKeyDown}
+                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="credit">Credit</option>
+                  <option value="debit">Debit</option>
+                </select>
+              ) : (
+                <span
+                  className={`font-semibold ${
+                    transaction.type === "credit" ? "text-green-700" : "text-red-700"
+                  }`}
+                >
+                  {transaction.type}
+                </span>
+              )}
+            </td>
+            <td className="p-3">
+              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+                <Input
+                  type="date"
+                  value={editingCell.fields.date}
+                  onChange={(e) => handleInlineChange("date", e.target.value)}
+                  onKeyDown={handleInlineKeyDown}
+                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                new Date(transaction.date).toLocaleDateString()
+              )}
+            </td>
+            <td className="p-3">
+              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+                <Input
+                  type="text"
+                  value={editingCell.fields.description}
+                  onChange={(e) => handleInlineChange("description", e.target.value)}
+                  onKeyDown={handleInlineKeyDown}
+                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                transaction.description
+              )}
+            </td>
+            <td className="p-3">
+              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+                <Input
+                  type="number"
+                  value={editingCell.fields.amount}
+                  onChange={(e) => handleInlineChange("amount", e.target.value)}
+                  onKeyDown={handleInlineKeyDown}
+                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                `Rs${(transaction.amount ?? 0).toLocaleString('en-IN')}`
+              )}
+            </td>
+          </tr>
+        ))}
+        {paginatedTransactions.length === 0 && (
+          <tr>
+            <td colSpan="4" className="text-center py-6 text-gray-500">
+              No transactions found.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+
+  {totalPages > 1 && (
+    <div className="mt-4 flex justify-center items-center gap-2">
+      <button
+        onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+        disabled={currentPage === 1}
+        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <span className="text-gray-700 font-medium">
+        Page {currentPage} of {totalPages}
+      </span>
+      <button
+        onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+        disabled={currentPage === totalPages}
+        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  )}
+</div>
       </div>
     </div>
   );
