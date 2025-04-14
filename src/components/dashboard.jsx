@@ -10,14 +10,18 @@ import {
   fetchTransactionsAsync,
   updateTransactionAsync,
   fetchProfitAsync,
+  addTransactionOptimistic,
+  updateTransactionOptimistic,
+  rollbackTransaction,
 } from "../Redux/transactionSlice";
 import Logo from "../images/logo1.png";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { transactions, profit } = useSelector((state) => state.transactions);
+  const { transactions, profit, pendingTransactions } = useSelector((state) => state.transactions);
   const { user } = useSelector((state) => state.auth);
   const userId = useSelector((state) => state.auth.user?._id);
+  const token = useSelector((state) => state.auth.token);
 
   const [filter, setFilter] = useState("all");
 
@@ -103,18 +107,39 @@ const Dashboard = () => {
       }
 
       const timestamp = new Date().toISOString();
+      const transactionData = { type, amount, description, date: timestamp };
 
-      await dispatch(
-        addTransactionAsync({ type, amount, description, date: timestamp })
-      );
+      try {
+        // Optimistically update UI
+        dispatch(addTransactionOptimistic(transactionData));
+        
+        // Clear form
+        if (type === "credit") {
+          setCredit({ amount: "", description: "", date: timestamp });
+        } else {
+          setDebit({ amount: "", description: "", date: timestamp });
+        }
 
-      dispatch(fetchTransactionsAsync(userId));
-      dispatch(fetchProfitAsync(userId));
-
-      setCredit({ amount: "", description: "", date: timestamp });
-      setDebit({ amount: "", description: "", date: timestamp });
+        // Send to server
+        const result = await dispatch(addTransactionAsync(transactionData)).unwrap();
+        
+        // Refetch to ensure consistency (optional)
+        dispatch(fetchTransactionsAsync(userId));
+        dispatch(fetchProfitAsync(userId));
+        
+      } catch (error) {
+        // Rollback on error
+        const tempId = pendingTransactions.find(id => 
+          transactions.some(t => t._id === id && t.description === description)
+        );
+        dispatch(rollbackTransaction({ 
+          tempId, 
+          error: error.message || "Failed to add transaction",
+          transaction: transactionData
+        }));
+      }
     },
-    [dispatch, userId]
+    [dispatch, userId, credit, debit, pendingTransactions, transactions]
   );
 
   const [editingCell, setEditingCell] = useState(null);
@@ -123,10 +148,11 @@ const Dashboard = () => {
   const startEditing = useCallback((index, transaction) => {
     setEditingCell({
       index,
+      transactionId: transaction._id,
       fields: {
         amount: transaction.amount,
         description: transaction.description,
-        date: transaction.date,
+        date: transaction.date.split("T")[0],
         type: transaction.type,
       },
     });
@@ -143,7 +169,7 @@ const Dashboard = () => {
     [editingCell]
   );
 
-  const saveInlineEdit = useCallback(() => {
+  const saveInlineEdit = useCallback(async () => {
     if (!editingCell) return;
 
     const { amount, description, date, type } = editingCell.fields;
@@ -154,23 +180,33 @@ const Dashboard = () => {
       return;
     }
 
-    dispatch(
-      updateTransactionAsync({
+    try {
+      // Optimistically update UI
+      dispatch(updateTransactionOptimistic({
         id: transaction._id,
-        amount,
-        description,
-        date,
-        type,
-      })
-    )
-      .unwrap()
-      .then(() => {
-        console.log("Update successful");
-        setEditingCell(null);
-      })
-      .catch((error) => {
-        console.error("Update failed:", error);
-      });
+        updates: { amount, description, date: new Date(date).toISOString(), type }
+      }));
+
+      // Send to server
+      const result = await dispatch(
+        updateTransactionAsync({
+          id: transaction._id,
+          amount,
+          description,
+          date: new Date(date).toISOString(),
+          type,
+        })
+      ).unwrap();
+
+      setEditingCell(null);
+    } catch (error) {
+      // Rollback on error
+      dispatch(rollbackTransaction({ 
+        id: transaction._id,
+        error: error.message || "Failed to update transaction"
+      }));
+      setEditingCell(null);
+    }
   }, [dispatch, editingCell, sortedTransactions]);
 
   const handleInlineKeyDown = useCallback(

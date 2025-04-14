@@ -1,47 +1,70 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import {
-  addTransaction,
-  fetchTransactions,
-  updateTransaction,
-  fetchProfit,
-} from "../../api/transaction";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axios from "axios";
+import { toast } from "react-toastify";
 
-export const addTransactionAsync = createAsyncThunk(
-  "transactions/add",
-  async (transactionData, { getState }) => {
-    const token = getState().auth.token;
-    const response = await addTransaction(transactionData, token);
-    return response.data;
+const API_URL = "https://khatasystem.martendigitals.com/api/v1/transactions";
+const EDIT_URL = "https://khatasystem.martendigitals.com/api/v1/transactions";
+const PROFIT_URL = "https://khatasystem.martendigitals.com/api/v1";
+
+export const fetchTransactionsAsync = createAsyncThunk(
+  "transactions/fetchTransactions",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_URL}/${userId}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch transactions");
+    }
   }
 );
+
 export const fetchProfitAsync = createAsyncThunk(
   "transactions/fetchProfit",
-  async (userId, { getState }) => {
-    const token = getState().auth.token;
-    const response = await fetchProfit(userId, token);
-    return response;
+  async (userId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${PROFIT_URL}/profit/${userId}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch profit data");
+    }
   }
 );
-export const fetchTransactionsAsync = createAsyncThunk(
-  "transactions/fetch",
-  async (userId, { getState }) => {
-    const token = getState().auth.token;
-    const response = await fetchTransactions(userId, token);
-    return response;
-  }
-);
-export const updateTransactionAsync = createAsyncThunk(
-  "transactions/update",
-  async ({ id, ...transactionData }, { getState, rejectWithValue, dispatch }) => {
+
+export const addTransactionAsync = createAsyncThunk(
+  "transactions/addTransaction",
+  async ({ type, amount, description, date }, { getState, rejectWithValue }) => {
     try {
       const token = getState().auth.token;
-      const response = await updateTransaction(id, transactionData, token);
+      const userId = getState().auth.user._id;
+      const response = await axios.post(
+        `${API_URL}/add`,
+        { type, amount, description, date, userId },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to add transaction");
+    }
+  }
+);
 
-      dispatch(fetchProfitAsync(getState().auth.user._id));
-
-      return response;
-    } catch (err) {
-      return rejectWithValue(err.response?.data || "Update failed");
+export const updateTransactionAsync = createAsyncThunk(
+  "transactions/updateTransaction",
+  async ({ id, amount, description, date, type }, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().auth.token;
+      const response = await axios.put(
+        `${EDIT_URL}/${id}`,
+        { amount, description, date, type },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to update transaction");
     }
   }
 );
@@ -50,44 +73,209 @@ const transactionSlice = createSlice({
   name: "transactions",
   initialState: {
     transactions: [],
-    profit: { totalCredit: 0, totalDebit: 0, netProfit: 0 },
-    status: "idle",
+    profit: { totalCredit: 0, totalDebit: 0, balance: 0 },
+    loading: false,
     error: null,
+    pendingTransactions: [], // Track pending optimistic updates
+    pendingUpdates: {}, // Track pending updates by ID
   },
-  reducers: {},
+  reducers: {
+    // Optimistically add a transaction
+    addTransactionOptimistic: (state, action) => {
+      const tempId = `temp-${Date.now()}`;
+      state.transactions.unshift({
+        ...action.payload,
+        _id: tempId,
+        isOptimistic: true,
+      });
+      state.pendingTransactions.push(tempId);
+      // Update profit calculations optimistically
+      if (action.payload.type === "credit") {
+        state.profit.totalCredit += Number(action.payload.amount);
+        state.profit.balance += Number(action.payload.amount);
+      } else {
+        state.profit.totalDebit += Number(action.payload.amount);
+        state.profit.balance -= Number(action.payload.amount);
+      }
+    },
+    // Optimistically update a transaction
+    updateTransactionOptimistic: (state, action) => {
+      const { id, updates } = action.payload;
+      const index = state.transactions.findIndex(t => t._id === id);
+      
+      if (index !== -1) {
+        const originalTransaction = state.transactions[index];
+        
+        // Store original values in case we need to rollback
+        if (!state.pendingUpdates[id]) {
+          state.pendingUpdates[id] = {
+            original: { ...originalTransaction },
+            updates: { ...updates }
+          };
+        }
+        
+        // Apply the updates
+        state.transactions[index] = {
+          ...state.transactions[index],
+          ...updates,
+          isOptimistic: true
+        };
+        
+        // Recalculate profit if amount or type changed
+        if (updates.amount !== undefined || updates.type !== undefined) {
+          const oldAmount = Number(originalTransaction.amount);
+          const newAmount = updates.amount !== undefined ? 
+            Number(updates.amount) : oldAmount;
+          const newType = updates.type || originalTransaction.type;
+          
+          // Remove old values from profit
+          if (originalTransaction.type === "credit") {
+            state.profit.totalCredit -= oldAmount;
+            state.profit.balance -= oldAmount;
+          } else {
+            state.profit.totalDebit -= oldAmount;
+            state.profit.balance += oldAmount;
+          }
+          
+          // Add new values to profit
+          if (newType === "credit") {
+            state.profit.totalCredit += newAmount;
+            state.profit.balance += newAmount;
+          } else {
+            state.profit.totalDebit += newAmount;
+            state.profit.balance -= newAmount;
+          }
+        }
+      }
+    },
+    // Rollback a failed optimistic update
+    rollbackTransaction: (state, action) => {
+      const { tempId, id, error, transaction } = action.payload;
+    
+      // Rollback add transaction
+      if (tempId) {
+        const index = state.transactions.findIndex((t) => t._id === tempId);
+        if (index !== -1) {
+          const t = state.transactions[index];
+          state.transactions.splice(index, 1);
+          state.pendingTransactions = state.pendingTransactions.filter((i) => i !== tempId);
+    
+          // Rollback profit
+          if (t.type === "credit") {
+            state.profit.totalCredit -= Number(t.amount);
+            state.profit.balance -= Number(t.amount);
+          } else {
+            state.profit.totalDebit -= Number(t.amount);
+            state.profit.balance += Number(t.amount);
+          }
+        }
+      }
+    
+      // Rollback update transaction
+      if (id && state.pendingUpdates[id]) {
+        const { original } = state.pendingUpdates[id];
+        const index = state.transactions.findIndex((t) => t._id === id);
+        if (index !== -1) {
+          state.transactions[index] = original;
+    
+          // Recalculate profit
+          state.profit.totalCredit = state.transactions
+            .filter((t) => t.type === "credit")
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+          state.profit.totalDebit = state.transactions
+            .filter((t) => t.type === "debit")
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+          state.profit.balance = state.profit.totalCredit - state.profit.totalDebit;
+        }
+    
+        delete state.pendingUpdates[id];
+      }
+    
+      toast.error(error || "Operation failed. Changes reverted.");
+    }    
+  },
   extraReducers: (builder) => {
     builder
-    .addCase(addTransactionAsync.fulfilled, (state, action) => {
-      if (!action.payload || !action.payload.transaction) return;
-    
-      state.transactions = [...state.transactions, action.payload.transaction];
-      state.profit = action.payload.profit;
-    })
-      .addCase(fetchTransactionsAsync.fulfilled, (state, action) => {
-        state.transactions = action.payload;
+      .addCase(fetchTransactionsAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      .addCase(updateTransactionAsync.fulfilled, (state, action) => {
-        if (!action.payload) return;
-      
-        const { updatedTransaction, profit } = action.payload;
-      
-        if (!updatedTransaction) return;
-      
-        state.transactions = state.transactions.map((t) =>
-          t._id === updatedTransaction._id ? updatedTransaction : t
+      .addCase(fetchTransactionsAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions = action.payload;
+        // Filter out any pending transactions that were successfully saved
+        state.pendingTransactions = state.pendingTransactions.filter(
+          tempId => !action.payload.some(t => t._id === tempId)
         );
-      
-        if (profit) {
-          state.profit = { ...profit };
-        }
-      })      
-      .addCase(updateTransactionAsync.rejected, (state, action) => {
-        console.error("Transaction update failed:", action.payload);
+      })
+      .addCase(fetchTransactionsAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchProfitAsync.pending, (state) => {
+        state.loading = true;
       })
       .addCase(fetchProfitAsync.fulfilled, (state, action) => {
+        state.loading = false;
         state.profit = action.payload;
+      })
+      .addCase(fetchProfitAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(addTransactionAsync.fulfilled, (state, action) => {
+        const realTransaction = action.payload;
+        
+        // Find and replace the optimistic transaction with the real one using matching content (amount, description, etc.)
+        const optimisticIndex = state.transactions.findIndex(
+          (t) =>
+            t.isOptimistic &&
+            t.amount === realTransaction.amount &&
+            t.description === realTransaction.description &&
+            t.date === realTransaction.date &&
+            t.type === realTransaction.type
+        );
+      
+        if (optimisticIndex !== -1) {
+          state.transactions[optimisticIndex] = {
+            ...realTransaction,
+            isOptimistic: false
+          };
+      
+          const tempId = state.transactions[optimisticIndex]._id;
+          state.pendingTransactions = state.pendingTransactions.filter((id) => id !== tempId);
+        } else {
+          // If not found, just add normally
+          state.transactions.unshift(realTransaction);
+        }
+      })
+      .addCase(addTransactionAsync.rejected, (state, action) => {
+        // The error will be handled by the rollback action dispatched from the component
+        state.error = action.payload;
+      })
+      .addCase(updateTransactionAsync.fulfilled, (state, action) => {
+        // Update the transaction with server response
+        const updatedTransaction = action.payload;
+        const index = state.transactions.findIndex(t => t._id === updatedTransaction._id);
+        
+        if (index !== -1) {
+          state.transactions[index] = updatedTransaction;
+          delete state.pendingUpdates[updatedTransaction._id];
+        }
+      })
+      .addCase(updateTransactionAsync.rejected, (state, action) => {
+        // The error will be handled by the rollback action dispatched from the component
+        state.error = action.payload;
       });
   },
 });
+
+export const { 
+  addTransactionOptimistic, 
+  updateTransactionOptimistic,
+  rollbackTransaction 
+} = transactionSlice.actions;
 
 export default transactionSlice.reducer;
