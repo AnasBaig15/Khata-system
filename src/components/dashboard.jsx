@@ -1,7 +1,14 @@
 import { useMemo, useCallback, useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useDebouncedCallback } from "use-debounce";
-import { Wallet, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { logoutUser } from "../Redux/authSlice";
@@ -18,17 +25,16 @@ import Logo from "../images/logo1.png";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { transactions, profit, pendingTransactions } = useSelector((state) => state.transactions);
+  const { transactions, profit, pendingTransactions } = useSelector(
+    (state) => state.transactions
+  );
   const { user } = useSelector((state) => state.auth);
   const userId = useSelector((state) => state.auth.user?._id);
   const token = useSelector((state) => state.auth.token);
   const [filter, setFilter] = useState("all");
   const [selectedDate, setSelectedDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const transactionsPerPage = 4;
- 
-
-
+  const transactionsPerPage = 10;
 
   useEffect(() => {
     if (user?._id) {
@@ -54,7 +60,7 @@ const Dashboard = () => {
 
   const filteredTransactions = useMemo(() => {
     let filtered = sortedTransactions;
-  
+
     if (selectedDate) {
       filtered = filtered.filter(
         (t) => new Date(t.date).toISOString().split("T")[0] === selectedDate
@@ -64,20 +70,21 @@ const Dashboard = () => {
     } else if (filter === "debit") {
       filtered = filtered.filter((t) => t.type === "debit");
     }
-  
+
     return filtered;
   }, [sortedTransactions, filter, selectedDate]);
-  
-  const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
+
+  const totalPages = Math.ceil(
+    filteredTransactions.length / transactionsPerPage
+  );
   const paginatedTransactions = useMemo(() => {
     const start = (currentPage - 1) * transactionsPerPage;
     return filteredTransactions.slice(start, start + transactionsPerPage);
   }, [filteredTransactions, currentPage]);
-  
+
   useEffect(() => {
     setCurrentPage(1);
   }, [filter, selectedDate]);
-  
 
   const [credit, setCredit] = useState({
     amount: "",
@@ -128,33 +135,47 @@ const Dashboard = () => {
         return;
       }
 
-      const timestamp = new Date().toISOString();
-      const transactionData = { type, amount, description, date: timestamp };
+      const selectedDate = new Date(date);
+      const transactionData = {
+        type,
+        amount,
+        description,
+        date: selectedDate.toISOString(),
+      };
 
       try {
         dispatch(addTransactionOptimistic(transactionData));
-        
+
         if (type === "credit") {
-          setCredit({ amount: "", description: "", date: timestamp });
+          setCredit({
+            amount: "",
+            description: "",
+            date: new Date().toISOString().split("T")[0],
+          });
         } else {
-          setDebit({ amount: "", description: "", date: timestamp });
+          setDebit({
+            amount: "",
+            description: "",
+            date: new Date().toISOString().split("T")[0],
+          });
         }
 
-        const result = await dispatch(addTransactionAsync(transactionData)).unwrap();
-        
+        await dispatch(addTransactionAsync(transactionData)).unwrap();
         dispatch(fetchTransactionsAsync(userId));
         dispatch(fetchProfitAsync(userId));
-        
       } catch (error) {
-
-        const tempId = pendingTransactions.find(id => 
-          transactions.some(t => t._id === id && t.description === description)
+        const tempId = pendingTransactions.find((id) =>
+          transactions.some(
+            (t) => t._id === id && t.description === description
+          )
         );
-        dispatch(rollbackTransaction({ 
-          tempId, 
-          error: error.message || "Failed to add transaction",
-          transaction: transactionData
-        }));
+        dispatch(
+          rollbackTransaction({
+            tempId,
+            error: error.message || "Failed to add transaction",
+            transaction: transactionData,
+          })
+        );
       }
     },
     [dispatch, userId, credit, debit, pendingTransactions, transactions]
@@ -199,10 +220,17 @@ const Dashboard = () => {
     }
 
     try {
-      dispatch(updateTransactionOptimistic({
-        id: transaction._id,
-        updates: { amount, description, date: new Date(date).toISOString(), type }
-      }));
+      dispatch(
+        updateTransactionOptimistic({
+          id: transaction._id,
+          updates: {
+            amount,
+            description,
+            date: new Date(date).toISOString(),
+            type,
+          },
+        })
+      );
 
       const result = await dispatch(
         updateTransactionAsync({
@@ -216,10 +244,12 @@ const Dashboard = () => {
 
       setEditingCell(null);
     } catch (error) {
-      dispatch(rollbackTransaction({ 
-        id: transaction._id,
-        error: error.message || "Failed to update transaction"
-      }));
+      dispatch(
+        rollbackTransaction({
+          id: transaction._id,
+          error: error.message || "Failed to update transaction",
+        })
+      );
       setEditingCell(null);
     }
   }, [dispatch, editingCell, sortedTransactions]);
@@ -264,96 +294,83 @@ const Dashboard = () => {
   }, [editingCell, saveInlineEdit]);
 
   return (
-    <div className="min-h-screen p-6 bg-[var(--primary)] flex flex-col items-center relative">
-      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20">
-        <img src={Logo} alt="Logo" className="w-32 h-auto" />
-      </div>
-
-      <button
-        onClick={handleLogout}
-        className="absolute top-6 right-6 bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors z-20"
-      >
-        Logout
-      </button>
-
-      <div
-        className={`${
-          isScrolled ? "sticky top-0" : "absolute top-30"
-        } left-6 right-6 z-10 grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300`}
-      >
-        <Card
-          className={`p-6 ${
-            isScrolled
-              ? "bg-gradient-to-br from-green-50 to-green-100 border-green-200"
-              : "bg-white border-gray-300"
-          } shadow-lg rounded-xl`}
+    <div className="min-h-screen p-6 bg-[var(--primary)]">
+      <header className="flex justify-between items-center mb-8">
+        <div className="flex items-center">
+          <img src={Logo} alt="Logo" className="w-32 h-auto" />
+        </div>
+        <button
+          onClick={handleLogout}
+          className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors"
         >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex items-center justify-center bg-green-200 rounded-full">
-              <TrendingUp className="text-green-700" size={24} />
-            </div>
-            <div>
-              <p className="text-[var(--secondary)] font-medium">
-                Total Credit
-              </p>
-              <p className="text-3xl font-bold text-green-700">
-              {(profit?.totalCredit ?? 0).toLocaleString('en-IN')} Rs
-              </p>
-            </div>
-          </div>
-        </Card>
+          Logout
+        </button>
+      </header>
 
-        <Card
-          className={`p-6 ${
-            isScrolled
-              ? "bg-gradient-to-br from-red-50 to-red-100 border-red-200"
-              : "bg-white border-gray-300"
-          } shadow-lg rounded-xl`}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex items-center justify-center bg-red-200 rounded-full">
-              <TrendingDown className="text-red-700" size={24} />
-            </div>
-            <div>
-              <p className="text-[var(--secondary)] font-medium">Total Debit</p>
-              <p className="text-3xl font-bold text-red-700">
-              {(profit?.totalDebit ?? 0).toLocaleString('en-IN')} Rs
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          className={`p-6 ${
-            isScrolled
-              ? "bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
-              : "bg-white border-gray-300"
-          } shadow-lg rounded-xl`}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex items-center justify-center bg-blue-200 rounded-full">
-              <Wallet className="text-blue-700" size={24} />
-            </div>
-            <div>
-              <p className="text-[var(--secondary)] font-medium">Net Profit</p>
-              <p className="text-3xl font-bold text-blue-700">
-              {(profit?.profit ?? 0).toLocaleString('en-IN')} Rs
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="mt-55 w-full max-w-6xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-6 shadow-lg bg-white">
-            <div className="flex justify-center items-center gap-2 mb-4">
-              <div className="w-10 h-10 flex items-center justify-center bg-green-200 rounded-full">
-                <TrendingUp className="text-green-700" size={21} />
+      <div className="flex justify-center mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
+          <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-lg rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 flex items-center justify-center bg-green-200 rounded-full">
+                <TrendingUp className="text-green-700" size={24} />
               </div>
-              <h3 className="text-xl font-bold text-green-700">Credit Entry</h3>
+              <div>
+                <p className="text-[var(--secondary)] font-medium">
+                  Total Credit
+                </p>
+                <p className="text-3xl font-bold text-green-700">
+                  {(profit?.totalCredit ?? 0).toLocaleString("en-IN")} Rs
+                </p>
+              </div>
             </div>
-            <div className="flex gap-4">
+          </Card>
+
+          <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100 border-red-200 shadow-lg rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 flex items-center justify-center bg-red-200 rounded-full">
+                <TrendingDown className="text-red-700" size={24} />
+              </div>
+              <div>
+                <p className="text-[var(--secondary)] font-medium">
+                  Total Debit
+                </p>
+                <p className="text-3xl font-bold text-red-700">
+                  {(profit?.totalDebit ?? 0).toLocaleString("en-IN")} Rs
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 flex items-center justify-center bg-blue-200 rounded-full">
+                <Wallet className="text-blue-700" size={24} />
+              </div>
+              <div>
+                <p className="text-[var(--secondary)] font-medium">
+                  Net Profit
+                </p>
+                <p className="text-3xl font-bold text-blue-700">
+                  {(profit?.profit ?? 0).toLocaleString("en-IN")} Rs
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-8 w-full">
+        <div className="w-full lg:w-1/3 space-y-6">
+          <Card className="p-6 shadow-lg bg-white">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 flex items-center justify-center bg-green-200 rounded-full">
+                  <TrendingUp className="text-green-700" size={21} />
+                </div>
+                <h3 className="text-xl font-bold text-green-700">
+                  Credit Entry
+                </h3>
+              </div>
               <Input
                 ref={creditRefs[0]}
                 type="number"
@@ -363,6 +380,7 @@ const Dashboard = () => {
                   setCredit({ ...credit, amount: e.target.value })
                 }
                 onKeyDown={(e) => handleKeyDown(e, 0, creditRefs, "credit")}
+                className="w-full"
               />
               <Input
                 ref={creditRefs[1]}
@@ -373,26 +391,27 @@ const Dashboard = () => {
                   setCredit({ ...credit, description: e.target.value })
                 }
                 onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
+                className="w-full"
               />
               <Input
                 ref={creditRefs[2]}
                 type="date"
-                className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
                 value={credit.date}
                 onChange={(e) => setCredit({ ...credit, date: e.target.value })}
                 onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
+                className="w-full text-[var(--secondary)]"
               />
             </div>
           </Card>
 
           <Card className="p-6 shadow-lg bg-white">
-            <div className="flex justify-center items-center gap-2 mb-4">
-              <div className="w-10 h-10 flex items-center justify-center bg-red-200 rounded-full">
-                <TrendingDown className="text-red-700" size={21} />
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 flex items-center justify-center bg-red-200 rounded-full">
+                  <TrendingDown className="text-red-700" size={21} />
+                </div>
+                <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
               </div>
-              <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
-            </div>
-            <div className="flex gap-4">
               <Input
                 ref={debitRefs[0]}
                 type="number"
@@ -400,6 +419,7 @@ const Dashboard = () => {
                 value={debit.amount}
                 onChange={(e) => setDebit({ ...debit, amount: e.target.value })}
                 onKeyDown={(e) => handleKeyDown(e, 0, debitRefs, "debit")}
+                className="w-full"
               />
               <Input
                 ref={debitRefs[1]}
@@ -410,194 +430,251 @@ const Dashboard = () => {
                   setDebit({ ...debit, description: e.target.value })
                 }
                 onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
+                className="w-full"
               />
               <Input
                 ref={debitRefs[2]}
                 type="date"
-                className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
                 value={debit.date}
                 onChange={(e) => setDebit({ ...debit, date: e.target.value })}
                 onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
+                className="w-full text-[var(--secondary)]"
               />
             </div>
           </Card>
         </div>
 
-        <div className="w-full mt-6">
+        <div className="w-full lg:w-2/3">
+          <Card className="p-6 shadow-lg bg-white">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <h3 className="text-xl text-[var(--dark)] font-semibold">
+                  Transaction List
+                </h3>
 
-  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-    <div className="flex gap-2">
-      <button
-        onClick={() => { setFilter('all'); setSelectedDate(''); }}
-        className={`px-4 py-2 rounded-lg transition-all ${
-          filter === 'all' && !selectedDate
-            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-        }`}
-      >
-        All
-      </button>
-      <button
-        onClick={() => { setFilter('credit'); setSelectedDate(''); }}
-        className={`px-4 py-2 rounded-lg transition-all ${
-          filter === 'credit' && !selectedDate
-            ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
-            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-        }`}
-      >
-        Credit
-      </button>
-      <button
-        onClick={() => { setFilter('debit'); setSelectedDate(''); }}
-        className={`px-4 py-2 rounded-lg transition-all ${
-          filter === 'debit' && !selectedDate
-            ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
-            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-        }`}
-      >
-        Debit
-      </button>
-    </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setFilter("all");
+                        setSelectedDate("");
+                      }}
+                      className={`px-4 py-2 rounded-lg transition-all ${
+                        filter === "all" && !selectedDate
+                          ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilter("credit");
+                        setSelectedDate("");
+                      }}
+                      className={`px-4 py-2 rounded-lg transition-all ${
+                        filter === "credit" && !selectedDate
+                          ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
+                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      }`}
+                    >
+                      Credit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilter("debit");
+                        setSelectedDate("");
+                      }}
+                      className={`px-4 py-2 rounded-lg transition-all ${
+                        filter === "debit" && !selectedDate
+                          ? "bg-red-500 text-white shadow-lg shadow-red-500/30"
+                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      }`}
+                    >
+                      Debit
+                    </button>
+                  </div>
 
-    <h3 className="text-xl text-[var(--dark)] font-semibold flex-1 text-center">
-      Transaction List
-    </h3>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full sm:w-auto border border-gray-300 bg-white text-[var(--secondary)]"
+                    />
+                    {selectedDate && (
+                      <button
+                        onClick={() => setSelectedDate("")}
+                        className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-    <div className="flex gap-2 items-center">
-      <Input
-        type="date"
-        value={selectedDate}
-        onChange={(e) => setSelectedDate(e.target.value)}
-         className="w-full border border-gray-300 bg-white text-[var(--secondary)]"
-      />
-      {selectedDate && (
-        <button
-          onClick={() => setSelectedDate("")}
-          className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400"
-        >
-          Clear
-        </button>
-      )}
-    </div>
-  </div>
+              <div className="overflow-x-auto">
+                <table className="w-full bg-white rounded-lg overflow-hidden">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-3 text-left text-[var(--secondary)]">
+                        Type
+                      </th>
+                      <th className="p-3 text-left text-[var(--secondary)]">
+                        Date
+                      </th>
+                      <th className="p-3 text-left text-[var(--secondary)]">
+                        Description
+                      </th>
+                      <th className="p-3 text-left text-[var(--secondary)]">
+                        Amount
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedTransactions.map((transaction, index) => (
+                      <tr
+                        key={transaction._id}
+                        className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() =>
+                          startEditing(
+                            (currentPage - 1) * transactionsPerPage + index,
+                            transaction
+                          )
+                        }
+                      >
+                        <td className="p-3">
+                          {editingCell?.index ===
+                          (currentPage - 1) * transactionsPerPage + index ? (
+                            <select
+                              value={editingCell.fields.type}
+                              onChange={(e) =>
+                                handleInlineChange("type", e.target.value)
+                              }
+                              onKeyDown={handleInlineKeyDown}
+                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                            >
+                              <option value="credit">Credit</option>
+                              <option value="debit">Debit</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`font-semibold ${
+                                transaction.type === "credit"
+                                  ? "text-green-700"
+                                  : "text-red-700"
+                              }`}
+                            >
+                              {transaction.type}
+                            </span>
+                          )}
+                        </td>
 
-  <div className="border-t border-gray-300 p-4">
-  <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
-    <thead className="bg-white">
-      <tr>
-        <th className="p-3 text-left text-[var(--secondary)]">Type</th>
-        <th className="p-3 text-left text-[var(--secondary)]">Date</th>
-        <th className="p-3 text-left text-[var(--secondary)]">Description</th>
-        <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      {paginatedTransactions.map((transaction, index) => (
-        <tr
-          key={transaction._id}
-          className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
-          onClick={() =>
-            startEditing(
-              (currentPage - 1) * transactionsPerPage + index,
-              transaction
-            )
-          }
-        >
-          <td className="p-3">
-            {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-              <select
-                value={editingCell.fields.type}
-                onChange={(e) => handleInlineChange("type", e.target.value)}
-                onKeyDown={handleInlineKeyDown}
-                className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="credit">Credit</option>
-                <option value="debit">Debit</option>
-              </select>
-            ) : (
-              <span
-                className={`font-semibold ${
-                  transaction.type === "credit" ? "text-green-700" : "text-red-700"
-                }`}
-              >
-                {transaction.type}
-              </span>
-            )}
-          </td>
-          <td className="p-3">
-              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-                <Input
-                  type="date"
-                  value={editingCell.fields.date}
-                  onChange={(e) => handleInlineChange("date", e.target.value)}
-                  onKeyDown={handleInlineKeyDown}
-                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                new Date(transaction.date).toLocaleDateString()
+                        <td className="p-3">
+                          {editingCell?.index ===
+                          (currentPage - 1) * transactionsPerPage + index ? (
+                            <Input
+                              type="date"
+                              value={editingCell.fields.date}
+                              onChange={(e) =>
+                                handleInlineChange("date", e.target.value)
+                              }
+                              onKeyDown={handleInlineKeyDown}
+                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                            />
+                          ) : (
+                            <span className="text-[var(--secondary)]">
+                              {new Date(transaction.date).toLocaleDateString()}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {editingCell?.index ===
+                          (currentPage - 1) * transactionsPerPage + index ? (
+                            <Input
+                              type="text"
+                              value={editingCell.fields.description}
+                              onChange={(e) =>
+                                handleInlineChange(
+                                  "description",
+                                  e.target.value
+                                )
+                              }
+                              onKeyDown={handleInlineKeyDown}
+                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                            />
+                          ) : (
+                            <span className="text-[var(--secondary)]">
+                              {transaction.description}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {editingCell?.index ===
+                          (currentPage - 1) * transactionsPerPage + index ? (
+                            <Input
+                              type="number"
+                              value={editingCell.fields.amount}
+                              onChange={(e) =>
+                                handleInlineChange("amount", e.target.value)
+                              }
+                              onKeyDown={handleInlineKeyDown}
+                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                            />
+                          ) : (
+                            <span className="text-[var(--secondary)]">
+                              Rs{" "}
+                              {(transaction.amount ?? 0).toLocaleString(
+                                "en-IN"
+                              )}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {paginatedTransactions.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="4"
+                          className="text-center py-6 text-gray-500"
+                        >
+                          No transactions found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-4 flex justify-center items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="text-gray-700 font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(p + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
               )}
-            </td>
-          <td className="p-3">
-            {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-              <Input
-                type="text"
-                value={editingCell.fields.description}
-                onChange={(e) => handleInlineChange("description", e.target.value)}
-                onKeyDown={handleInlineKeyDown}
-                className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              transaction.description
-            )}
-          </td>
-          <td className="p-3">
-            {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-              <Input
-                type="number"
-                value={editingCell.fields.amount}
-                onChange={(e) => handleInlineChange("amount", e.target.value)}
-                onKeyDown={handleInlineKeyDown}
-                className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            ) : (
-              `Rs${(transaction.amount ?? 0).toLocaleString("en-IN")}`
-            )}
-          </td>
-        </tr>
-      ))}
-      {paginatedTransactions.length === 0 && (
-        <tr>
-          <td colSpan="4" className="text-center py-6 text-gray-500">
-            No transactions found.
-          </td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-</div>
-
-  {totalPages > 1 && (
-    <div className="mt-4 flex justify-center items-center gap-2">
-      <button
-        onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-        disabled={currentPage === 1}
-        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-      >
-        <ChevronLeft size={18} />
-      </button>
-      <span className="text-gray-700 font-medium">
-        Page {currentPage} of {totalPages}
-      </span>
-      <button
-        onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-        disabled={currentPage === totalPages}
-        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-      >
-        <ChevronRight size={18} />
-      </button>
-    </div>
-  )}
-</div>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
