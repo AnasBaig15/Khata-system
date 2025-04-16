@@ -80,7 +80,6 @@ const transactionSlice = createSlice({
     pendingUpdates: {},
   },
   reducers: {
-
     addTransactionOptimistic: (state, action) => {
       const tempId = `temp-${Date.now()}`;
       state.transactions.unshift({
@@ -214,28 +213,36 @@ const transactionSlice = createSlice({
         state.error = action.payload;
       })
       .addCase(addTransactionAsync.fulfilled, (state, action) => {
-        const realTransaction = action.payload;
+         const realTransaction = action.payload;
         
-        const optimisticIndex = state.transactions.findIndex(
-          (t) =>
-            t.isOptimistic &&
-            t.amount === realTransaction.amount &&
-            t.description === realTransaction.description &&
-            t.date === realTransaction.date &&
-            t.type === realTransaction.type
+         const optimisticIndex = state.transactions.findIndex(
+          t => t.isOptimistic && 
+               t._id === state.pendingTransactions.find(id => id === t._id)
         );
       
         if (optimisticIndex !== -1) {
+          // Direct replacement without changing array order
           state.transactions[optimisticIndex] = {
             ...realTransaction,
             isOptimistic: false
           };
-      
-          const tempId = state.transactions[optimisticIndex]._id;
-          state.pendingTransactions = state.pendingTransactions.filter((id) => id !== tempId);
-        } else {
-          state.transactions.unshift(realTransaction);
+          state.pendingTransactions = state.pendingTransactions.filter(
+            id => id !== state.transactions[optimisticIndex]._id
+          );
         }
+        else {
+          // No optimistic match found: push real transaction and update profit
+          state.transactions.unshift(realTransaction);
+        
+          if (realTransaction.type === "credit") {
+            state.profit.totalCredit += Number(realTransaction.amount);
+            state.profit.balance += Number(realTransaction.amount);
+          } else {
+            state.profit.totalDebit += Number(realTransaction.amount);
+            state.profit.balance -= Number(realTransaction.amount);
+          }
+        }
+        
       })
       .addCase(addTransactionAsync.rejected, (state, action) => {
         state.error = action.payload;

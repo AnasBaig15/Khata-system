@@ -482,49 +482,49 @@ const Dashboard = () => {
   </div>
 
   <div className="border-t border-gray-300 p-4">
-    <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
-      <thead className="bg-white">
-        <tr>
-          <th className="p-3 text-left text-[var(--secondary)]">Type</th>
-          <th className="p-3 text-left text-[var(--secondary)]">Date</th>
-          <th className="p-3 text-left text-[var(--secondary)]">Description</th>
-          <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {paginatedTransactions.map((transaction, index) => (
-          <tr
-            key={transaction._id}
-            className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
-            onClick={() =>
-              startEditing(
-                (currentPage - 1) * transactionsPerPage + index,
-                transaction
-              )
-            }
-          >
-            <td className="p-3">
-              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-                <select
-                  value={editingCell.fields.type}
-                  onChange={(e) => handleInlineChange("type", e.target.value)}
-                  onKeyDown={handleInlineKeyDown}
-                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="credit">Credit</option>
-                  <option value="debit">Debit</option>
-                </select>
-              ) : (
-                <span
-                  className={`font-semibold ${
-                    transaction.type === "credit" ? "text-green-700" : "text-red-700"
-                  }`}
-                >
-                  {transaction.type}
-                </span>
-              )}
-            </td>
-            <td className="p-3">
+  <table className="w-full bg-white rounded-lg shadow-lg overflow-hidden">
+    <thead className="bg-white">
+      <tr>
+        <th className="p-3 text-left text-[var(--secondary)]">Type</th>
+        <th className="p-3 text-left text-[var(--secondary)]">Date</th>
+        <th className="p-3 text-left text-[var(--secondary)]">Description</th>
+        <th className="p-3 text-left text-[var(--secondary)]">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {paginatedTransactions.map((transaction, index) => (
+        <tr
+          key={transaction._id}
+          className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+          onClick={() =>
+            startEditing(
+              (currentPage - 1) * transactionsPerPage + index,
+              transaction
+            )
+          }
+        >
+          <td className="p-3">
+            {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+              <select
+                value={editingCell.fields.type}
+                onChange={(e) => handleInlineChange("type", e.target.value)}
+                onKeyDown={handleInlineKeyDown}
+                className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="credit">Credit</option>
+                <option value="debit">Debit</option>
+              </select>
+            ) : (
+              <span
+                className={`font-semibold ${
+                  transaction.type === "credit" ? "text-green-700" : "text-red-700"
+                }`}
+              >
+                {transaction.type}
+              </span>
+            )}
+          </td>
+          <td className="p-3">
               {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
                 <Input
                   type="date"
@@ -537,44 +537,44 @@ const Dashboard = () => {
                 new Date(transaction.date).toLocaleDateString()
               )}
             </td>
-            <td className="p-3">
-              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-                <Input
-                  type="text"
-                  value={editingCell.fields.description}
-                  onChange={(e) => handleInlineChange("description", e.target.value)}
-                  onKeyDown={handleInlineKeyDown}
-                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                transaction.description
-              )}
-            </td>
-            <td className="p-3">
-              {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
-                <Input
-                  type="number"
-                  value={editingCell.fields.amount}
-                  onChange={(e) => handleInlineChange("amount", e.target.value)}
-                  onKeyDown={handleInlineKeyDown}
-                  className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                `Rs${(transaction.amount ?? 0).toLocaleString('en-IN')}`
-              )}
-            </td>
-          </tr>
-        ))}
-        {paginatedTransactions.length === 0 && (
-          <tr>
-            <td colSpan="4" className="text-center py-6 text-gray-500">
-              No transactions found.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
+          <td className="p-3">
+            {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+              <Input
+                type="text"
+                value={editingCell.fields.description}
+                onChange={(e) => handleInlineChange("description", e.target.value)}
+                onKeyDown={handleInlineKeyDown}
+                className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              transaction.description
+            )}
+          </td>
+          <td className="p-3">
+            {editingCell?.index === (currentPage - 1) * transactionsPerPage + index ? (
+              <Input
+                type="number"
+                value={editingCell.fields.amount}
+                onChange={(e) => handleInlineChange("amount", e.target.value)}
+                onKeyDown={handleInlineKeyDown}
+                className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              `Rs${(transaction.amount ?? 0).toLocaleString("en-IN")}`
+            )}
+          </td>
+        </tr>
+      ))}
+      {paginatedTransactions.length === 0 && (
+        <tr>
+          <td colSpan="4" className="text-center py-6 text-gray-500">
+            No transactions found.
+          </td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</div>
 
   {totalPages > 1 && (
     <div className="mt-4 flex justify-center items-center gap-2">
