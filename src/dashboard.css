@@ -150,10 +150,16 @@ width: 100%;
 }
 
 .card-title {
-  color: var(--secondary);
+  color: #808597;
   font-weight: 500;
 }
+.credit-bg {
+  background-color: #f0fdf4 !important;
+}
 
+.debit-bg {
+  background-color: #fef2f2 !important;
+}
 .card-value {
   font-size: 1.875rem;
   font-weight: bold;

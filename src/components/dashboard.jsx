@@ -524,7 +524,9 @@ const Dashboard = () => {
                     {paginatedTransactions.map((transaction, index) => (
                       <tr
                         key={transaction._id}
-                        className="transaction-row"
+                        className={`transaction-row ${
+    transaction.type === "credit" ? "credit-bg" : "debit-bg"
+  }`}
                         onClick={() =>
                           startEditing(
                             (currentPage - 1) * transactionsPerPage + index,
