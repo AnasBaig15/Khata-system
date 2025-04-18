@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import "../dashboard.css";
 import { useDebouncedCallback } from "use-debounce";
 import {
   Wallet,
@@ -178,7 +179,7 @@ const Dashboard = () => {
         );
       }
     },
-    [dispatch, userId, credit, debit, pendingTransactions, transactions]
+    [dispatch, userId, pendingTransactions, transactions]
   );
 
   const [editingCell, setEditingCell] = useState(null);
@@ -264,19 +265,24 @@ const Dashboard = () => {
     [saveInlineEdit]
   );
 
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [isSticky, setIsSticky] = useState(false);
+
+  const handleScroll = () => {
+    const offsetTop = document
+      .getElementById("stickyCards")
+      .getBoundingClientRect().top;
+    if (offsetTop <= 0) {
+      setIsSticky(true);
+    } else {
+      setIsSticky(false);
+    }
+  };
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
-    };
-
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -294,63 +300,57 @@ const Dashboard = () => {
   }, [editingCell, saveInlineEdit]);
 
   return (
-    <div className="min-h-screen p-6 bg-[var(--primary)]">
-      <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center">
-          <img src={Logo} alt="Logo" className="w-32 h-auto" />
+    <div className="main-container">
+      <header className="header">
+        <div className="logo-container">
+          <img src={Logo} alt="Logo" className="logo" />
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors"
-        >
+        <button onClick={handleLogout} className="logout-button">
           Logout
         </button>
       </header>
 
-      <div className="flex justify-center mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
-          <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-lg rounded-xl">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 flex items-center justify-center bg-green-200 rounded-full">
-                <TrendingUp className="text-green-700" size={24} />
+      <div className="card-container">
+        <div
+          id="stickyCards"
+          className={`card-grid ${isSticky ? "no-border" : "with-border"}`}
+        >
+          <Card className={`card green-card ${isSticky ? "no-shadow" : ""}`}>
+            <div className="card-content">
+              <div className="card-icon green-icon">
+                <TrendingUp className="icon-green" size={24} />
               </div>
               <div>
-                <p className="text-[var(--secondary)] font-medium">
-                  Total Credit
-                </p>
-                <p className="text-3xl font-bold text-green-700">
+                <p className="card-title">Total Credit</p>
+                <p className="card-value green-text">
                   {(profit?.totalCredit ?? 0).toLocaleString("en-IN")} Rs
                 </p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100 border-red-200 shadow-lg rounded-xl">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 flex items-center justify-center bg-red-200 rounded-full">
-                <TrendingDown className="text-red-700" size={24} />
+          <Card className={`card red-card ${isSticky ? "no-shadow" : ""}`}>
+            <div className="card-content">
+              <div className="card-icon red-icon">
+                <TrendingDown className="icon-red" size={24} />
               </div>
               <div>
-                <p className="text-[var(--secondary)] font-medium">
-                  Total Debit
-                </p>
-                <p className="text-3xl font-bold text-red-700">
+                <p className="card-title">Total Debit</p>
+                <p className="card-value red-text">
                   {(profit?.totalDebit ?? 0).toLocaleString("en-IN")} Rs
                 </p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg rounded-xl">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 flex items-center justify-center bg-blue-200 rounded-full">
-                <Wallet className="text-blue-700" size={24} />
+          <Card className={`card blue-card ${isSticky ? "no-shadow" : ""}`}>
+            <div className="card-content">
+              <div className="card-icon blue-icon">
+                <Wallet className="icon-blue" size={24} />
               </div>
               <div>
-                <p className="text-[var(--secondary)] font-medium">
-                  Net Profit
-                </p>
-                <p className="text-3xl font-bold text-blue-700">
+                <p className="card-title">Net Profit</p>
+                <p className="card-value blue-text">
                   {(profit?.profit ?? 0).toLocaleString("en-IN")} Rs
                 </p>
               </div>
@@ -359,17 +359,15 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 w-full">
-        <div className="w-full lg:w-1/3 space-y-6">
-          <Card className="p-6 shadow-lg bg-white">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-10 h-10 flex items-center justify-center bg-green-200 rounded-full">
-                  <TrendingUp className="text-green-700" size={21} />
+      <div className="responsive-row">
+        <div className="form-wrapper">
+          <Card className="form-card">
+            <div className="form-content">
+              <div className="form-header green-header">
+                <div className="form-icon green-icon">
+                  <TrendingUp className="icon-green" size={21} />
                 </div>
-                <h3 className="text-xl font-bold text-green-700">
-                  Credit Entry
-                </h3>
+                <h3 className="form-title green-text">Credit Entry</h3>
               </div>
               <Input
                 ref={creditRefs[0]}
@@ -380,7 +378,7 @@ const Dashboard = () => {
                   setCredit({ ...credit, amount: e.target.value })
                 }
                 onKeyDown={(e) => handleKeyDown(e, 0, creditRefs, "credit")}
-                className="w-full"
+                className="form-input"
               />
               <Input
                 ref={creditRefs[1]}
@@ -391,7 +389,7 @@ const Dashboard = () => {
                   setCredit({ ...credit, description: e.target.value })
                 }
                 onKeyDown={(e) => handleKeyDown(e, 1, creditRefs, "credit")}
-                className="w-full"
+                className="form-input"
               />
               <Input
                 ref={creditRefs[2]}
@@ -399,18 +397,18 @@ const Dashboard = () => {
                 value={credit.date}
                 onChange={(e) => setCredit({ ...credit, date: e.target.value })}
                 onKeyDown={(e) => handleKeyDown(e, 2, creditRefs, "credit")}
-                className="w-full text-[var(--secondary)]"
+                className="form-input date-input"
               />
             </div>
           </Card>
 
-          <Card className="p-6 shadow-lg bg-white">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-10 h-10 flex items-center justify-center bg-red-200 rounded-full">
-                  <TrendingDown className="text-red-700" size={21} />
+          <Card className="form-card">
+            <div className="form-content">
+              <div className="form-header red-header">
+                <div className="form-icon red-icon">
+                  <TrendingDown className="icon-red" size={21} />
                 </div>
-                <h3 className="text-xl font-bold text-red-700">Debit Entry</h3>
+                <h3 className="form-title red-text">Debit Entry</h3>
               </div>
               <Input
                 ref={debitRefs[0]}
@@ -419,7 +417,7 @@ const Dashboard = () => {
                 value={debit.amount}
                 onChange={(e) => setDebit({ ...debit, amount: e.target.value })}
                 onKeyDown={(e) => handleKeyDown(e, 0, debitRefs, "debit")}
-                className="w-full"
+                className="form-input"
               />
               <Input
                 ref={debitRefs[1]}
@@ -430,7 +428,7 @@ const Dashboard = () => {
                   setDebit({ ...debit, description: e.target.value })
                 }
                 onKeyDown={(e) => handleKeyDown(e, 1, debitRefs, "debit")}
-                className="w-full"
+                className="form-input"
               />
               <Input
                 ref={debitRefs[2]}
@@ -438,31 +436,29 @@ const Dashboard = () => {
                 value={debit.date}
                 onChange={(e) => setDebit({ ...debit, date: e.target.value })}
                 onKeyDown={(e) => handleKeyDown(e, 2, debitRefs, "debit")}
-                className="w-full text-[var(--secondary)]"
+                className="form-input date-input"
               />
             </div>
           </Card>
         </div>
 
-        <div className="w-full lg:w-2/3">
-          <Card className="p-6 shadow-lg bg-white">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                <h3 className="text-xl text-[var(--dark)] font-semibold">
-                  Transaction List
-                </h3>
+        <div className="transactions-container">
+          <Card className="transactions-card">
+            <div className="transactions-inner">
+              <div className="transactions-header">
+                <h3 className="transactions-title">Transaction List</h3>
 
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                  <div className="flex gap-2">
+                <div className="transactions-filters">
+                  <div className="filter-buttons">
                     <button
                       onClick={() => {
                         setFilter("all");
                         setSelectedDate("");
                       }}
-                      className={`px-4 py-2 rounded-lg transition-all ${
+                      className={`filter-btn ${
                         filter === "all" && !selectedDate
-                          ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          ? "active-all"
+                          : "inactive"
                       }`}
                     >
                       All
@@ -472,10 +468,10 @@ const Dashboard = () => {
                         setFilter("credit");
                         setSelectedDate("");
                       }}
-                      className={`px-4 py-2 rounded-lg transition-all ${
+                      className={`filter-btn ${
                         filter === "credit" && !selectedDate
-                          ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
-                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          ? "active-credit"
+                          : "inactive"
                       }`}
                     >
                       Credit
@@ -485,27 +481,27 @@ const Dashboard = () => {
                         setFilter("debit");
                         setSelectedDate("");
                       }}
-                      className={`px-4 py-2 rounded-lg transition-all ${
+                      className={`filter-btn ${
                         filter === "debit" && !selectedDate
-                          ? "bg-red-500 text-white shadow-lg shadow-red-500/30"
-                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          ? "active-debit"
+                          : "inactive"
                       }`}
                     >
                       Debit
                     </button>
                   </div>
 
-                  <div className="flex gap-2 items-center">
+                  <div className="date-filter">
                     <Input
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full sm:w-auto border border-gray-300 bg-white text-[var(--secondary)]"
+                      className="date-input"
                     />
                     {selectedDate && (
                       <button
                         onClick={() => setSelectedDate("")}
-                        className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400"
+                        className="clear-date-btn"
                       >
                         Clear
                       </button>
@@ -514,29 +510,21 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full bg-white rounded-lg overflow-hidden">
-                  <thead className="bg-gray-100">
+              <div className="table-wrapper">
+                <table className="transactions-table">
+                  <thead>
                     <tr>
-                      <th className="p-3 text-left text-[var(--secondary)]">
-                        Type
-                      </th>
-                      <th className="p-3 text-left text-[var(--secondary)]">
-                        Date
-                      </th>
-                      <th className="p-3 text-left text-[var(--secondary)]">
-                        Description
-                      </th>
-                      <th className="p-3 text-left text-[var(--secondary)]">
-                        Amount
-                      </th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedTransactions.map((transaction, index) => (
                       <tr
                         key={transaction._id}
-                        className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+                        className="transaction-row"
                         onClick={() =>
                           startEditing(
                             (currentPage - 1) * transactionsPerPage + index,
@@ -544,7 +532,7 @@ const Dashboard = () => {
                           )
                         }
                       >
-                        <td className="p-3">
+                        <td>
                           {editingCell?.index ===
                           (currentPage - 1) * transactionsPerPage + index ? (
                             <select
@@ -553,25 +541,24 @@ const Dashboard = () => {
                                 handleInlineChange("type", e.target.value)
                               }
                               onKeyDown={handleInlineKeyDown}
-                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                              className="editable-input"
                             >
                               <option value="credit">Credit</option>
                               <option value="debit">Debit</option>
                             </select>
                           ) : (
                             <span
-                              className={`font-semibold ${
+                              className={`type-label ${
                                 transaction.type === "credit"
-                                  ? "text-green-700"
-                                  : "text-red-700"
+                                  ? "credit-label"
+                                  : "debit-label"
                               }`}
                             >
                               {transaction.type}
                             </span>
                           )}
                         </td>
-
-                        <td className="p-3">
+                        <td>
                           {editingCell?.index ===
                           (currentPage - 1) * transactionsPerPage + index ? (
                             <Input
@@ -581,16 +568,15 @@ const Dashboard = () => {
                                 handleInlineChange("date", e.target.value)
                               }
                               onKeyDown={handleInlineKeyDown}
-                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                              className="editable-input"
                             />
                           ) : (
-                            <span className="text-[var(--secondary)]">
+                            <span className="secondary-text">
                               {new Date(transaction.date).toLocaleDateString()}
                             </span>
                           )}
                         </td>
-
-                        <td className="p-3">
+                        <td>
                           {editingCell?.index ===
                           (currentPage - 1) * transactionsPerPage + index ? (
                             <Input
@@ -603,16 +589,15 @@ const Dashboard = () => {
                                 )
                               }
                               onKeyDown={handleInlineKeyDown}
-                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                              className="editable-input"
                             />
                           ) : (
-                            <span className="text-[var(--secondary)]">
+                            <span className="secondary-text">
                               {transaction.description}
                             </span>
                           )}
                         </td>
-
-                        <td className="p-3">
+                        <td>
                           {editingCell?.index ===
                           (currentPage - 1) * transactionsPerPage + index ? (
                             <Input
@@ -622,14 +607,11 @@ const Dashboard = () => {
                                 handleInlineChange("amount", e.target.value)
                               }
                               onKeyDown={handleInlineKeyDown}
-                              className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--secondary)]"
+                              className="editable-input"
                             />
                           ) : (
-                            <span className="text-[var(--secondary)]">
-                              Rs{" "}
-                              {(transaction.amount ?? 0).toLocaleString(
-                                "en-IN"
-                              )}
+                            <span className="secondary-text">
+                              Rs {transaction.amount?.toLocaleString("en-IN")}
                             </span>
                           )}
                         </td>
@@ -637,10 +619,7 @@ const Dashboard = () => {
                     ))}
                     {paginatedTransactions.length === 0 && (
                       <tr>
-                        <td
-                          colSpan="4"
-                          className="text-center py-6 text-gray-500"
-                        >
+                        <td colSpan="4" className="no-data">
                           No transactions found.
                         </td>
                       </tr>
@@ -650,15 +629,15 @@ const Dashboard = () => {
               </div>
 
               {totalPages > 1 && (
-                <div className="mt-4 flex justify-center items-center gap-2">
+                <div className="pagination">
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                     disabled={currentPage === 1}
-                    className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                    className="page-btn"
                   >
                     <ChevronLeft size={18} />
                   </button>
-                  <span className="text-gray-700 font-medium">
+                  <span className="page-info">
                     Page {currentPage} of {totalPages}
                   </span>
                   <button
@@ -666,7 +645,7 @@ const Dashboard = () => {
                       setCurrentPage((p) => Math.min(p + 1, totalPages))
                     }
                     disabled={currentPage === totalPages}
-                    className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                    className="page-btn"
                   >
                     <ChevronRight size={18} />
                   </button>
