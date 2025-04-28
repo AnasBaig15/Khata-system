@@ -12,8 +12,8 @@ export const addTransaction = async (transactionData, token) => {
   return response.data;
 };
 
-export const fetchTransactions = async (userId, token) => {
-  const response = await axios.get(`${API_URL}/${userId}`, {
+export const fetchTransactions = async (token) => {
+  const response = await axios.get(`${API_URL}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return response.data;
@@ -31,7 +31,7 @@ export const updateTransaction = async (id, transactionData, token) => {
 };
 
 export const fetchProfit = async (userId, token) => {
-  const response = await axios.get(`https://khatasystem.martendigitals.com/api/v1/profit/${userId}`, {
+  const response = await axios.get(`https://khatasystem.martendigitals.com/api/v1/profit`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return response.data;

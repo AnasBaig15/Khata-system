@@ -54,39 +54,51 @@ const Dashboard = () => {
   }, [dispatch, userId]);
 
   const sortedTransactions = useMemo(() => {
-    return [...transactions].sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
+    return [...transactions].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      
+      if (dateA === dateB) {
+        return b._id.localeCompare(a._id);
+      }      
+      return dateB - dateA;
+    });
   }, [transactions]);
-
   const filteredTransactions = useMemo(() => {
     let filtered = sortedTransactions;
-
+    
     if (selectedDate) {
       filtered = filtered.filter(
-        (t) => new Date(t.date).toISOString().split("T")[0] === selectedDate
+        t => new Date(t.date).toISOString().split("T")[0] === selectedDate
       );
     } else if (filter === "credit") {
-      filtered = filtered.filter((t) => t.type === "credit");
+      filtered = filtered.filter(t => t.type === "credit");
     } else if (filter === "debit") {
-      filtered = filtered.filter((t) => t.type === "debit");
+      filtered = filtered.filter(t => t.type === "debit");
     }
-
+    
     return filtered;
   }, [sortedTransactions, filter, selectedDate]);
-
-  const totalPages = Math.ceil(
-    filteredTransactions.length / transactionsPerPage
-  );
+  
+  const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
+  
   const paginatedTransactions = useMemo(() => {
     const start = (currentPage - 1) * transactionsPerPage;
     return filteredTransactions.slice(start, start + transactionsPerPage);
-  }, [filteredTransactions, currentPage]);
-
+  }, [filteredTransactions, currentPage, transactionsPerPage]);
+  
   useEffect(() => {
     setCurrentPage(1);
   }, [filter, selectedDate]);
-
+  console.log("Transaction dates:", 
+    transactions.map(t => ({
+      id: t._id, 
+      date: t.date,
+      parsedDate: new Date(t.date),
+      isValid: !isNaN(new Date(t.date).getTime())
+    }))
+  );
+  
   const [credit, setCredit] = useState({
     amount: "",
     description: "",
@@ -305,12 +317,7 @@ const Dashboard = () => {
         <div className="logo-container">
           <img src={Logo} alt="Logo" className="logo" />
         </div>
-        <button onClick={handleLogout} className="logout-button">
-          Logout
-        </button>
-      </header>
-
-      <div className="card-container">
+        <div className="card-container">
         <div
           id="stickyCards"
           className={`card-grid ${isSticky ? "no-border" : "with-border"}`}
@@ -358,6 +365,10 @@ const Dashboard = () => {
           </Card>
         </div>
       </div>
+        <button onClick={handleLogout} className="logout-button">
+          Logout
+        </button>
+      </header>
 
       <div className="responsive-row">
         <div className="form-wrapper">
@@ -496,7 +507,7 @@ const Dashboard = () => {
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="date-input"
+                      className="date-input no-native-icon"
                     />
                     {selectedDate && (
                       <button
@@ -518,6 +529,7 @@ const Dashboard = () => {
                       <th>Date</th>
                       <th>Description</th>
                       <th>Amount</th>
+                      <th>Added by</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -525,8 +537,8 @@ const Dashboard = () => {
                       <tr
                         key={transaction._id}
                         className={`transaction-row ${
-    transaction.type === "credit" ? "credit-bg" : "debit-bg"
-  }`}
+                        transaction.type === "credit" ? "credit-bg" : "debit-bg"
+                        }`}
                         onClick={() =>
                           startEditing(
                             (currentPage - 1) * transactionsPerPage + index,
@@ -616,6 +628,11 @@ const Dashboard = () => {
                               Rs {transaction.amount?.toLocaleString("en-IN")}
                             </span>
                           )}
+                        </td>
+                        <td>
+                         <span className="secondary-text">
+                          {transaction.userId?.fullname || "--"}
+                         </span>
                         </td>
                       </tr>
                     ))}

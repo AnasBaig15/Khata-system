@@ -76,72 +76,9 @@ function Login() {
             {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
-
-        <p className="signup-footer">
-          Don’t have an account?{" "}
-          <a href="/register" className="register-link">
-            Register here
-          </a>
-        </p>
       </div>
     </div>
   );
 }
 
 export default Login;
-
-{/* <div className="container">
-<div className="card">
-  <div className="logo">
-    <img src={Logo} alt="Logo" />
-  </div>
-
-  <h2 className="title">Welcome Back!</h2>
-  <p className="subtitle">Sign in to continue</p>
-
-  <form className="form" onSubmit={handleLogin}>
-    <div>
-      <label className="label">Email Address</label>
-      <input
-        type="email"
-        name="email"
-        autoComplete="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="input"
-      />
-    </div>
-
-    <div>
-      <label className="label">Password</label>
-      <input
-        type="password"
-        name="password"
-        autoComplete="current-password"
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="input"
-      />
-    </div>
-
-    <div>
-      <a href="#" className="forgot-password">
-        Forgot your password?
-      </a>
-    </div>
-
-    <button type="submit" className="button" disabled={loading}>
-      {loading ? "Signing in..." : "Sign in"}
-    </button>
-  </form>
-
-  <p className="register-text">
-    Don’t have an account?{" "}
-    <a href="/register" className="register-link">
-      Register here
-    </a>
-  </p>
-</div>
-</div> */}

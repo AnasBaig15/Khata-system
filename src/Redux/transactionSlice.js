@@ -8,9 +8,9 @@ const PROFIT_URL = "https://khatasystem.martendigitals.com/api/v1";
 
 export const fetchTransactionsAsync = createAsyncThunk(
   "transactions/fetchTransactions",
-  async (userId, { rejectWithValue }) => {
+  async ({ rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_URL}/${userId}`);
+      const response = await axios.get(`${API_URL}`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -22,9 +22,12 @@ export const fetchTransactionsAsync = createAsyncThunk(
 
 export const fetchProfitAsync = createAsyncThunk(
   "transactions/fetchProfit",
-  async (userId, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     try {
-      const response = await axios.get(`${PROFIT_URL}/profit/${userId}`);
+      const token = getState().auth.token;
+      const response = await axios.get(`${PROFIT_URL}/profit`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -33,6 +36,7 @@ export const fetchProfitAsync = createAsyncThunk(
     }
   }
 );
+
 
 export const addTransactionAsync = createAsyncThunk(
   "transactions/addTransaction",
@@ -87,7 +91,7 @@ const transactionSlice = createSlice({
   name: "transactions",
   initialState: {
     transactions: [],
-    profit: { totalCredit: 0, totalDebit: 0, balance: 0 },
+    profits: [],   
     loading: false,
     error: null,
     pendingTransactions: [],
@@ -223,7 +227,16 @@ const transactionSlice = createSlice({
       })
       .addCase(fetchProfitAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.profit = action.payload;
+                
+        const arr = action.payload;
+        const totalCredit = arr.reduce((sum, p) => sum + p.totalCredit, 0);
+        const totalDebit  = arr.reduce((sum, p) => sum + p.totalDebit,  0);
+      
+        state.profit = {
+          totalCredit,
+          totalDebit,
+          profit: totalCredit - totalDebit,
+        };
       })
       .addCase(fetchProfitAsync.rejected, (state, action) => {
         state.loading = false;
